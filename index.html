@@ -1,4 +1,4 @@
-
+```html
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -15,7 +15,7 @@
         
         body { 
             -webkit-tap-highlight-color: transparent; 
-            padding-top: calc(var(--sat) + 10px);
+            padding-top: calc(var(--sat) + 100px);
             background-color: #f8fafc;
         }
 
@@ -157,6 +157,7 @@
 
                     <div class="relative h-[430px] w-full perspective-1000">
                         <div class="relative w-full h-full preserve-3d ${isFlipped ? 'rotate-y-180' : ''}" onclick="handleFlip()">
+                            <!-- Frente -->
                             <div class="absolute inset-0 backface-hidden bg-white border border-slate-100 rounded-[40px] shadow-sm flex flex-col items-center justify-center p-8 text-center">
                                 <button onclick="event.stopPropagation(); startEditCard('${card.id}')" class="absolute top-6 right-8 text-slate-300 active:text-indigo-500 p-2">✏️</button>
                                 <span class="absolute top-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-slate-300 uppercase tracking-widest">
@@ -172,12 +173,13 @@
                                 ` : ''}
                             </div>
                             
+                            <!-- Verso -->
                             <div class="absolute inset-0 backface-hidden bg-indigo-600 border border-indigo-700 rounded-[40px] shadow-xl flex flex-col items-center justify-center p-8 text-center rotate-y-180">
                                 <button onclick="event.stopPropagation(); startEditCard('${card.id}')" class="absolute top-6 right-8 text-white/40 active:text-white p-2">✏️</button>
                                 <div class="text-2xl font-bold text-white mb-6">
                                     ${card.type === 'cloze' ? card.f.replace(/\[(.*?)\]/g, '<span class="text-yellow-300 underline">$1</span>') : card.b}
                                 </div>
-                                ${card.ex ? `<div class="bg-indigo-700/40 p-5 rounded-3xl border border-indigo-500/30 text-left w-full"><p class="text-[8px] font-black text-indigo-300 uppercase mb-1">Exemplo</p><p class="text-sm text-white/90 italic leading-relaxed">"${card.ex}"</p></div>` : ''}
+                                ${card.ex ? `<div class="bg-indigo-700/40 p-5 rounded-3xl border border-indigo-500/30 text-left w-full"><p class="text-[8px] font-black text-indigo-300 uppercase mb-1">Frase Exemplo</p><p class="text-sm text-white/90 italic leading-relaxed">"${card.ex}"</p></div>` : ''}
                                 <button onclick="event.stopPropagation(); triggerVersoAudio('${card.id}')" class="mt-6 text-white bg-white/20 w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-transform">🔊</button>
                             </div>
                         </div>
@@ -205,7 +207,6 @@
             `;
         }
 
-        // Funções de Gerenciamento permanecem as mesmas
         function createNewDeck() {
             const name = document.getElementById('deckNameInput').value.trim();
             if (name) { decks.push({ id: Date.now(), name, cards: [] }); saveDecks(); showAddDeckModal = false; render(); }
@@ -243,10 +244,23 @@
                 const p = line.split(';').map(s => s.trim());
                 if (p[0]) {
                     let type = 'basic';
-                    if (p[0].includes('[') && p[0].includes(']')) type = 'cloze';
-                    else if (p[2]) type = 'complete';
+                    let f = p[0];
+                    let b = p[1] || '';
+                    let ex = p[2] || '';
+                    let hint = p[3] || '';
+
+                    // Lógica específica para Lacuna (Cloze) na importação em massa
+                    if (f.includes('[') && f.includes(']')) {
+                        type = 'cloze';
+                        // Se for lacuna, o segundo campo fornecido (p[1]) já é a dica
+                        hint = b; 
+                        b = ''; // Limpa verso pois lacuna usa a própria frente formatada
+                    } else if (ex) {
+                        type = 'complete';
+                    }
+
                     decks[idx].cards.push({
-                        id: Date.now() + i, type, f: p[0], b: p[1] || '', ex: p[2] || '', hint: p[3] || '',
+                        id: Date.now() + i, type, f, b, ex, hint,
                         interval: 0, repetition: 0, efactor: 2.5, dueDate: new Date().toISOString()
                     });
                 }
@@ -333,10 +347,10 @@
                             <div class="grid grid-cols-3 gap-1 mb-6">
                                 <button onclick="cardSubtype='basic'; render();" class="text-[8px] font-black uppercase py-2 border rounded-lg ${cardSubtype==='basic'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-100 text-slate-400'}">1. Básico</button>
                                 <button onclick="cardSubtype='complete'; render();" class="text-[8px] font-black uppercase py-2 border rounded-lg ${cardSubtype==='complete'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-100 text-slate-400'}">2. Completo</button>
-                                <button onclick="cardSubtype='cloze'; render();" class="text-[8px] font-black uppercase py-2 border rounded-lg ${cardSubtype==='cloze'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-100 text-slate-400'}">3. Lacuna</button>
+                                <button onclick="cardSubtype='cloze' ; render();" class="text-[8px] font-black uppercase py-2 border rounded-lg ${cardSubtype==='cloze'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-100 text-slate-400'}">3. Lacuna</button>
                             </div>
                             <div class="space-y-4">
-                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [lacuna]' : 'Palavra'}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [lacuna]' : 'Frente (Palavra)'}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
                                 ${cardSubtype !== 'cloze' ? `<textarea id="newB" placeholder="Verso (Tradução)" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>` : ''}
                                 ${cardSubtype === 'complete' ? `<textarea id="newEx" placeholder="Frase de Exemplo" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>` : ''}
                                 ${cardSubtype === 'cloze' ? `<input id="newHint" placeholder="Dica (Opcional)" class="w-full bg-slate-50 border-0 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none">` : ''}
@@ -344,10 +358,14 @@
                             </div>
                         ` : `
                             <div class="bg-indigo-50 p-4 rounded-2xl mb-4 border border-indigo-100">
-                                <h3 class="text-[10px] font-black text-indigo-600 uppercase mb-2">Orientações:</h3>
-                                <ul class="text-[9px] text-indigo-900/70 space-y-1 font-medium"><li>• Use ponto e vírgula (;)</li><li>• Modo Lacuna: use [resposta]</li><li>• Ordem: Palavra ; Tradução ; Exemplo</li></ul>
+                                <h3 class="text-[10px] font-black text-indigo-600 uppercase mb-2">Orientações (Massa):</h3>
+                                <ul class="text-[9px] text-indigo-900/70 space-y-1 font-medium">
+                                    <li>• Use ponto e vírgula (;)</li>
+                                    <li>• <b>Básico:</b> Palavra ; Tradução</li>
+                                    <li>• <b>Lacuna:</b> Frase com [lacuna] ; Dica</li>
+                                </ul>
                             </div>
-                            <textarea id="bulkData" placeholder="Ex: apple ; maçã&#10;Ex: I eat an [apple] ; maçã&#10" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-56 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-[10px]"></textarea>
+                            <textarea id="bulkData" placeholder="Ex: I drink [coffee] ; café&#10;Ex: cat ; gato" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-56 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-[10px]"></textarea>
                             <button onclick="saveBulkCards()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold mt-4">Importar Todos</button>
                         `}
                     </div>
