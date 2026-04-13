@@ -18,7 +18,7 @@
         
         body { 
             -webkit-tap-highlight-color: transparent; 
-            padding-top: calc(var(--sat) + 10px);
+            padding-top: calc(var(--sat) + 20px);
             padding-bottom: calc(var(--sab) + 5px);
             background-color: #f8fafc;
             min-height: 100vh;
@@ -57,11 +57,13 @@
         let showHint = false;
         
         let showAddDeckModal = false;
+        let showRenameDeckModal = false;
         let showAddCardModal = false;
         let showEditCardModal = false;
         let showManageCardsModal = false;
         
         let editingCardId = null;
+        let renamingDeckId = null;
         let addMode = 'single'; 
         let cardSubtype = 'basic'; 
 
@@ -115,16 +117,20 @@
                         const dueCount = getDueCards(deck).length;
                         return `
                         <div onclick="openDeck(${deck.id})" class="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex justify-between items-center active:scale-95 transition-all cursor-pointer">
-                            <div>
-                                <h2 class="text-xl font-bold text-slate-800">${deck.name}</h2>
+                            <div class="flex-1 truncate pr-4">
+                                <h2 class="text-xl font-bold text-slate-800 truncate">${deck.name}</h2>
                                 <p class="text-sm ${dueCount > 0 ? 'text-indigo-500 font-bold' : 'text-slate-400'}">${dueCount} revisões</p>
                             </div>
-                            <button onclick="event.stopPropagation(); if(confirm('Excluir baralho?')) deleteDeck(${deck.id})" class="text-slate-300 hover:text-red-500 p-2 text-xl">&times;</button>
+                            <div class="flex gap-2">
+                                <button onclick="event.stopPropagation(); startRenameDeck(${deck.id})" class="text-slate-300 hover:text-indigo-500 p-2 text-lg">✏️</button>
+                                <button onclick="event.stopPropagation(); if(confirm('Excluir baralho?')) deleteDeck(${deck.id})" class="text-slate-300 hover:text-red-500 p-2 text-xl">&times;</button>
+                            </div>
                         </div>
                         `;
                     }).join('')}
                 </div>
                 ${showAddDeckModal ? renderAddDeckModal() : ''}
+                ${showRenameDeckModal ? renderRenameDeckModal() : ''}
             `;
         }
 
@@ -140,6 +146,38 @@
                         </div>
                     </div>
                 </div>`;
+        }
+
+        function startRenameDeck(id) {
+            renamingDeckId = id;
+            showRenameDeckModal = true;
+            render();
+        }
+
+        function renderRenameDeckModal() {
+            const deck = decks.find(d => d.id === renamingDeckId);
+            return `
+                <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+                    <div class="bg-white rounded-[40px] p-8 w-full max-w-sm modal-enter">
+                        <h2 class="text-xl font-black text-slate-800 mb-6 uppercase text-center">Renomear</h2>
+                        <input id="renameDeckInput" value="${deck.name}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 mb-4 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <div class="flex gap-2">
+                            <button onclick="showRenameDeckModal=false; render();" class="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold">Voltar</button>
+                            <button onclick="saveNewDeckName()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold">Salvar</button>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function saveNewDeckName() {
+            const newName = document.getElementById('renameDeckInput').value.trim();
+            if (newName) {
+                const idx = decks.findIndex(d => d.id === renamingDeckId);
+                decks[idx].name = newName;
+                saveDecks();
+                showRenameDeckModal = false;
+                render();
+            }
         }
 
         function renderStudy(root) {
@@ -240,17 +278,12 @@
             }
         }
 
-        // Função de áudio do verso com pausa entre tradução e exemplo
         function triggerVersoAudio(cardId) {
             const deck = decks.find(d => d.id === currentDeckId);
             const card = deck.cards.find(c => String(c.id) === String(cardId));
             if (!card) return;
-
             const mainText = card.type === 'cloze' ? card.f : card.b;
-            
-            // Fala a tradução/termo principal primeiro
             speak(mainText, () => {
-                // Se houver frase de exemplo, aguarda 1 segundo e fala o exemplo
                 if (card.ex) {
                     setTimeout(() => speak(card.ex), 1000);
                 }
