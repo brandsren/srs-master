@@ -1,4 +1,4 @@
-
+```html
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -7,7 +7,10 @@
     <title>SRS Master Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        :root { --sat: env(safe-area-inset-top); }
+        :root { 
+            --sat: env(safe-area-inset-top); 
+            --sab: env(safe-area-inset-bottom);
+        }
         .perspective-1000 { perspective: 1000px; }
         .preserve-3d { transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
         .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
@@ -15,8 +18,12 @@
         
         body { 
             -webkit-tap-highlight-color: transparent; 
-            padding-top: calc(var(--sat) + 20px);
+            padding-top: calc(var(--sat) + 10px);
+            padding-bottom: calc(var(--sab) + 20px);
             background-color: #f8fafc;
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
         }
 
         .modal-enter { animation: modalIn 0.3s ease-out; }
@@ -37,10 +44,10 @@
     </style>
 </head>
 <body class="text-slate-900 font-sans">
-    <div id="root" class="max-w-md mx-auto p-4 min-h-screen"></div>
+    <div id="root" class="max-w-md mx-auto p-4"></div>
 
     <script>
-        // --- State Management ---
+        // --- Estado Global ---
         let decks = JSON.parse(localStorage.getItem('srs_v8_decks') || '[]');
         let config = JSON.parse(localStorage.getItem('srs_config_v8') || '{"autoFront": true, "autoBack": true}');
         
@@ -62,13 +69,18 @@
         const saveConfig = () => localStorage.setItem('srs_config_v8', JSON.stringify(config));
         const getDueCards = (deck) => (deck && deck.cards ? deck.cards.filter(c => new Date(c.dueDate) <= new Date()) : []);
 
-        function speak(text) {
-            if (!text) return;
+        // Função de fala com suporte a pausa
+        function speak(text, callback) {
+            if (!text) {
+                if(callback) callback();
+                return;
+            }
             window.speechSynthesis.cancel();
             const cleanText = text.replace(/\[(.*?)\]/g, '$1'); 
             const utterance = new SpeechSynthesisUtterance(cleanText);
             utterance.lang = 'en-US';
             utterance.rate = 0.85; 
+            utterance.onend = () => { if(callback) callback(); };
             window.speechSynthesis.speak(utterance);
         }
 
@@ -98,7 +110,6 @@
                     ${decks.length === 0 ? `
                         <div class="text-center py-20 bg-white rounded-[40px] border-2 border-dashed border-slate-200 p-8">
                             <p class="text-slate-400 font-medium">Nenhum baralho encontrado.</p>
-                            <button onclick="showAddDeckModal = true; render();" class="mt-4 text-indigo-600 font-bold text-sm underline">Criar agora</button>
                         </div>
                     ` : decks.map(deck => {
                         const dueCount = getDueCards(deck).length;
@@ -157,7 +168,6 @@
 
                     <div class="relative h-[430px] w-full perspective-1000">
                         <div class="relative w-full h-full preserve-3d ${isFlipped ? 'rotate-y-180' : ''}" onclick="handleFlip()">
-                            <!-- Frente -->
                             <div class="absolute inset-0 backface-hidden bg-white border border-slate-100 rounded-[40px] shadow-sm flex flex-col items-center justify-center p-8 text-center">
                                 <button onclick="event.stopPropagation(); startEditCard('${card.id}')" class="absolute top-6 right-8 text-slate-300 active:text-indigo-500 p-2">✏️</button>
                                 <span class="absolute top-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-slate-300 uppercase tracking-widest">
@@ -173,7 +183,6 @@
                                 ` : ''}
                             </div>
                             
-                            <!-- Verso -->
                             <div class="absolute inset-0 backface-hidden bg-indigo-600 border border-indigo-700 rounded-[40px] shadow-xl flex flex-col items-center justify-center p-8 text-center rotate-y-180">
                                 <button onclick="event.stopPropagation(); startEditCard('${card.id}')" class="absolute top-6 right-8 text-white/40 active:text-white p-2">✏️</button>
                                 <div class="text-2xl font-bold text-white mb-6">
@@ -221,53 +230,6 @@
             if (config.autoFront && due.length > 0) speak(due[0].f);
         }
 
-        function saveSingleCard() {
-            const f = document.getElementById('newF').value.trim();
-            if (!f) return;
-            const cardData = {
-                id: Date.now(), type: cardSubtype, f, 
-                b: cardSubtype === 'cloze' ? '' : document.getElementById('newB').value.trim(),
-                ex: cardSubtype === 'complete' ? document.getElementById('newEx').value.trim() : '',
-                hint: cardSubtype === 'cloze' ? document.getElementById('newHint').value.trim() : '',
-                interval: 0, repetition: 0, efactor: 2.5, dueDate: new Date().toISOString()
-            };
-            const idx = decks.findIndex(d => d.id === currentDeckId);
-            decks[idx].cards.push(cardData);
-            saveDecks(); showAddCardModal = false; render();
-        }
-
-        function saveBulkCards() {
-            const data = document.getElementById('bulkData').value.trim();
-            const lines = data.split('\n').filter(l => l.includes(';'));
-            const idx = decks.findIndex(d => d.id === currentDeckId);
-            lines.forEach((line, i) => {
-                const p = line.split(';').map(s => s.trim());
-                if (p[0]) {
-                    let type = 'basic';
-                    let f = p[0];
-                    let b = p[1] || '';
-                    let ex = p[2] || '';
-                    let hint = p[3] || '';
-
-                    // Lógica específica para Lacuna (Cloze) na importação em massa
-                    if (f.includes('[') && f.includes(']')) {
-                        type = 'cloze';
-                        // Se for lacuna, o segundo campo fornecido (p[1]) já é a dica
-                        hint = b; 
-                        b = ''; // Limpa verso pois lacuna usa a própria frente formatada
-                    } else if (ex) {
-                        type = 'complete';
-                    }
-
-                    decks[idx].cards.push({
-                        id: Date.now() + i, type, f, b, ex, hint,
-                        interval: 0, repetition: 0, efactor: 2.5, dueDate: new Date().toISOString()
-                    });
-                }
-            });
-            saveDecks(); showAddCardModal = false; render();
-        }
-
         function handleFlip() {
             if (isFlipped) return;
             isFlipped = true; render();
@@ -278,13 +240,21 @@
             }
         }
 
+        // Função de áudio do verso com pausa entre tradução e exemplo
         function triggerVersoAudio(cardId) {
             const deck = decks.find(d => d.id === currentDeckId);
             const card = deck.cards.find(c => String(c.id) === String(cardId));
             if (!card) return;
-            let textToSpeak = card.type === 'cloze' ? card.f : card.b;
-            if (card.ex) textToSpeak += ". " + card.ex;
-            speak(textToSpeak);
+
+            const mainText = card.type === 'cloze' ? card.f : card.b;
+            
+            // Fala a tradução/termo principal primeiro
+            speak(mainText, () => {
+                // Se houver frase de exemplo, aguarda 1 segundo e fala o exemplo
+                if (card.ex) {
+                    setTimeout(() => speak(card.ex), 1000);
+                }
+            });
         }
 
         function startEditCard(id) { 
@@ -341,7 +311,7 @@
                         </div>
                         <div class="flex bg-slate-100 p-1 rounded-2xl mb-6 text-[10px] font-black uppercase">
                             <button onclick="addMode='single'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='single'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Individual</button>
-                            <button onclick="addMode='bulk'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Em massa</button>
+                            <button onclick="addMode='bulk'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Massa (;)</button>
                         </div>
                         ${addMode === 'single' ? `
                             <div class="grid grid-cols-3 gap-1 mb-6">
@@ -422,6 +392,51 @@
                     </div>
                 </div>
             `;
+        }
+
+        function saveBulkCards() {
+            const data = document.getElementById('bulkData').value.trim();
+            const lines = data.split('\n').filter(l => l.includes(';'));
+            const idx = decks.findIndex(d => d.id === currentDeckId);
+            lines.forEach((line, i) => {
+                const p = line.split(';').map(s => s.trim());
+                if (p[0]) {
+                    let type = 'basic';
+                    let f = p[0];
+                    let b = p[1] || '';
+                    let ex = p[2] || '';
+                    let hint = p[3] || '';
+
+                    if (f.includes('[') && f.includes(']')) {
+                        type = 'cloze';
+                        hint = b; 
+                        b = ''; 
+                    } else if (ex) {
+                        type = 'complete';
+                    }
+
+                    decks[idx].cards.push({
+                        id: Date.now() + i, type, f, b, ex, hint,
+                        interval: 0, repetition: 0, efactor: 2.5, dueDate: new Date().toISOString()
+                    });
+                }
+            });
+            saveDecks(); showAddCardModal = false; render();
+        }
+
+        function saveSingleCard() {
+            const f = document.getElementById('newF').value.trim();
+            if (!f) return;
+            const cardData = {
+                id: Date.now(), type: cardSubtype, f, 
+                b: cardSubtype === 'cloze' ? '' : document.getElementById('newB').value.trim(),
+                ex: cardSubtype === 'complete' ? document.getElementById('newEx').value.trim() : '',
+                hint: cardSubtype === 'cloze' ? document.getElementById('newHint').value.trim() : '',
+                interval: 0, repetition: 0, efactor: 2.5, dueDate: new Date().toISOString()
+            };
+            const idx = decks.findIndex(d => d.id === currentDeckId);
+            decks[idx].cards.push(cardData);
+            saveDecks(); showAddCardModal = false; render();
         }
 
         render();
