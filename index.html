@@ -1,4 +1,4 @@
-```html
+
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -311,7 +311,7 @@
                         </div>
                         <div class="flex bg-slate-100 p-1 rounded-2xl mb-6 text-[10px] font-black uppercase">
                             <button onclick="addMode='single'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='single'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Individual</button>
-                            <button onclick="addMode='bulk'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Massa (;)</button>
+                            <button onclick="addMode='bulk'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Em massa</button>
                         </div>
                         ${addMode === 'single' ? `
                             <div class="grid grid-cols-3 gap-1 mb-6">
