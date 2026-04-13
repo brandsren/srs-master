@@ -73,7 +73,6 @@
         const saveDecks = () => localStorage.setItem('srs_v8_decks', JSON.stringify(decks));
         const saveConfig = () => localStorage.setItem('srs_config_v8', JSON.stringify(config));
         
-        // Filtra cards que precisam de revisão (data de hoje ou anterior)
         const getDueCards = (deck) => {
             if (!deck || !deck.cards) return [];
             return deck.cards.filter(c => new Date(c.dueDate) <= new Date());
@@ -207,7 +206,10 @@
 
                     <div class="relative h-[430px] w-full perspective-1000">
                         <div class="relative w-full h-full preserve-3d ${isFlipped ? 'rotate-y-180' : ''}" onclick="handleFlip()">
+                            <!-- FRENTE -->
                             <div class="absolute inset-0 backface-hidden bg-white border border-slate-100 rounded-[40px] shadow-sm flex flex-col items-center justify-center p-8 text-center">
+                                <button onclick="event.stopPropagation(); startEditCard('${card.id}', true)" class="absolute top-6 right-6 text-slate-300 text-lg p-2 active:scale-90 transition-transform">✏️</button>
+                                
                                 <span class="absolute top-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-slate-300 uppercase tracking-widest">
                                     ${card.type === 'cloze' ? 'Tipo: Lacuna' : 'Flashcard'}
                                 </span>
@@ -221,7 +223,10 @@
                                 ` : ''}
                             </div>
                             
+                            <!-- VERSO -->
                             <div class="absolute inset-0 backface-hidden bg-indigo-600 border border-indigo-700 rounded-[40px] shadow-xl flex flex-col items-center justify-center p-8 text-center rotate-y-180">
+                                <button onclick="event.stopPropagation(); startEditCard('${card.id}', true)" class="absolute top-6 right-6 text-indigo-400 text-lg p-2 active:scale-90 transition-transform">✏️</button>
+
                                 <div class="text-2xl font-bold text-white mb-6">
                                     ${card.type === 'cloze' ? card.f.replace(/\[(.*?)\]/g, '<span class="text-yellow-300 underline">$1</span>') : card.b}
                                 </div>
@@ -343,7 +348,7 @@
                     </div>
                     <div class="flex gap-3 flex-shrink-0 items-center">
                         <button onclick="startPreviewCard('${c.id}')" class="text-slate-400">👁️</button>
-                        <button onclick="startEditCard('${c.id}')" class="text-slate-400">✏️</button>
+                        <button onclick="startEditCard('${c.id}', false)" class="text-slate-400">✏️</button>
                         <button onclick="deleteCard('${c.id}')" class="text-slate-300 text-xl font-bold">&times;</button>
                     </div>
                 </div>
@@ -408,7 +413,14 @@
             `;
         }
 
-        function startEditCard(id) { editingCardId = id; showEditCardModal = true; showManageCardsModal = false; render(); }
+        let isEditingFromStudy = false;
+        function startEditCard(id, fromStudy = false) { 
+            editingCardId = id; 
+            isEditingFromStudy = fromStudy;
+            showEditCardModal = true; 
+            showManageCardsModal = false; 
+            render(); 
+        }
 
         function saveEditedCard() {
             const dIdx = decks.findIndex(d => d.id === currentDeckId);
@@ -418,7 +430,14 @@
             if (decks[dIdx].cards[cIdx].type !== 'cloze') decks[dIdx].cards[cIdx].b = document.getElementById('editB').value.trim();
             if (decks[dIdx].cards[cIdx].type === 'complete') decks[dIdx].cards[cIdx].ex = document.getElementById('editEx').value.trim();
             if (decks[dIdx].cards[cIdx].type === 'cloze') decks[dIdx].cards[cIdx].hint = document.getElementById('editHint').value.trim();
-            saveDecks(); showEditCardModal = false; showManageCardsModal = true; render();
+            saveDecks(); 
+            showEditCardModal = false; 
+            if (isEditingFromStudy) {
+                render();
+            } else {
+                showManageCardsModal = true; 
+                render();
+            }
         }
 
         function renderEditCardModal() {
@@ -426,17 +445,30 @@
             const card = deck.cards.find(c => String(c.id) === String(editingCardId));
             if(!card) return '';
             return `
-                <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-6">
-                    <div class="bg-white rounded-[40px] p-8 w-full max-w-sm modal-enter">
+                <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] flex items-center justify-center p-6">
+                    <div class="bg-white rounded-[40px] p-8 w-full max-w-sm modal-enter shadow-2xl">
                         <h2 class="text-xl font-black text-slate-800 mb-6 uppercase">Editar Card</h2>
                         <div class="space-y-3">
+                            <p class="text-[9px] font-black text-slate-400 uppercase ml-1">Frente</p>
                             <textarea id="editF" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 outline-none focus:ring-2 focus:ring-indigo-500">${card.f}</textarea>
-                            ${card.type !== 'cloze' ? `<textarea id="editB" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 outline-none focus:ring-2 focus:ring-indigo-500">${card.b || ''}</textarea>` : ''}
-                            ${card.type === 'complete' ? `<textarea id="editEx" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 outline-none focus:ring-2 focus:ring-indigo-500">${card.ex || ''}</textarea>` : ''}
-                            ${card.type === 'cloze' ? `<input id="editHint" value="${card.hint || ''}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500">` : ''}
+                            
+                            ${card.type !== 'cloze' ? `
+                                <p class="text-[9px] font-black text-slate-400 uppercase ml-1">Verso / Tradução</p>
+                                <textarea id="editB" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 outline-none focus:ring-2 focus:ring-indigo-500">${card.b || ''}</textarea>
+                            ` : ''}
+                            
+                            ${card.type === 'complete' ? `
+                                <p class="text-[9px] font-black text-slate-400 uppercase ml-1">Exemplo</p>
+                                <textarea id="editEx" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 outline-none focus:ring-2 focus:ring-indigo-500">${card.ex || ''}</textarea>
+                            ` : ''}
+                            
+                            ${card.type === 'cloze' ? `
+                                <p class="text-[9px] font-black text-slate-400 uppercase ml-1">Dica</p>
+                                <input id="editHint" value="${card.hint || ''}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500">
+                            ` : ''}
                         </div>
                         <div class="flex gap-2 mt-6">
-                            <button onclick="showEditCardModal=false; showManageCardsModal=true; render();" class="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold">Voltar</button>
+                            <button onclick="showEditCardModal=false; ${isEditingFromStudy ? '' : 'showManageCardsModal=true;'} render();" class="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold">Voltar</button>
                             <button onclick="saveEditedCard()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold">Salvar</button>
                         </div>
                     </div>
@@ -461,49 +493,37 @@
             let { interval, repetition, efactor, type } = decks[dIdx].cards[cIdx];
 
             if (q >= 3) {
-                // Algoritmo para acertos (Bom ou Fácil)
                 if (repetition === 0) interval = 1; 
                 else if (repetition === 1) interval = 6;
                 else interval = Math.round(interval * efactor);
                 
                 repetition++;
-                // Atualiza a data para o futuro
                 const newDate = new Date(); 
                 newDate.setDate(newDate.getDate() + interval);
                 decks[dIdx].cards[cIdx].dueDate = newDate.toISOString();
             } else if (q === 2) {
-                // Difícil: volta em 1 dia obrigatoriamente
                 interval = 1;
                 repetition = 0;
                 const newDate = new Date(); 
                 newDate.setDate(newDate.getDate() + interval);
                 decks[dIdx].cards[cIdx].dueDate = newDate.toISOString();
             } else {
-                // ERREI: Volta no mesmo dia!
-                // Resetamos o progresso mas NÃO mudamos a data para amanhã.
-                // Movemos o card para o final do array para ele reaparecer nesta sessão.
                 repetition = 0;
                 interval = 0;
-                
                 const cardToMove = decks[dIdx].cards.splice(cIdx, 1)[0];
                 cardToMove.repetition = 0;
                 cardToMove.interval = 0;
-                // Garante que o dueDate é "agora" para continuar na fila
                 cardToMove.dueDate = new Date().toISOString(); 
                 decks[dIdx].cards.push(cardToMove);
             }
 
-            // Ajuste do E-Factor (Dificuldade do Card)
             efactor = Math.max(1.3, efactor + (0.1 - (5-q)*(0.08 + (5-q)*0.02)));
             
-            // Se não foi um "Errei", o cIdx ainda é o mesmo (ou o card já saiu da fila)
-            // Se foi "Errei", o card já foi atualizado e movido acima.
             if (q >= 2) {
                 decks[dIdx].cards[cIdx].interval = interval;
                 decks[dIdx].cards[cIdx].repetition = repetition;
                 decks[dIdx].cards[cIdx].efactor = efactor;
             } else {
-                // Para o Errei, apenas atualizamos o E-factor no card que movemos
                 decks[dIdx].cards[decks[dIdx].cards.length - 1].efactor = efactor;
             }
 
