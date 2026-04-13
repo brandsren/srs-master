@@ -336,7 +336,7 @@
                                 <button onclick="cardSubtype='cloze'; render();" class="text-[8px] font-black uppercase py-2 border rounded-lg ${cardSubtype==='cloze'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-100 text-slate-400'}">3. Lacuna</button>
                             </div>
                             <div class="space-y-4">
-                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [lacuna]' : 'Frente (Palavra)'}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [lacuna]' : 'Palavra'}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
                                 ${cardSubtype !== 'cloze' ? `<textarea id="newB" placeholder="Verso (Tradução)" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>` : ''}
                                 ${cardSubtype === 'complete' ? `<textarea id="newEx" placeholder="Frase de Exemplo" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>` : ''}
                                 ${cardSubtype === 'cloze' ? `<input id="newHint" placeholder="Dica (Opcional)" class="w-full bg-slate-50 border-0 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none">` : ''}
