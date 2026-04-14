@@ -594,7 +594,7 @@
                         </div>
                         <div class="flex bg-slate-100 p-1 rounded-2xl mb-6 text-[10px] font-black uppercase">
                             <button onclick="addMode='single'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='single'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Individual</button>
-                            <button onclick="addMode='bulk'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Massa (;)</button>
+                            <button onclick="addMode='bulk'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Em massa</button>
                         </div>
                         ${addMode === 'single' ? `
                             <div class="grid grid-cols-3 gap-1 mb-6">
@@ -610,7 +610,7 @@
                                 <button onclick="saveSingleCard()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-md">Salvar Card</button>
                             </div>
                         ` : `
-                            <textarea id="bulkData" placeholder="Ex: I drink [coffee] ; café&#10;Ex: cat ; gato" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-56 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-[10px]"></textarea>
+                            <textarea id="bulkData" placeholder="Ex: I drink [coffee] ; café&#10;Ex: gato ; cat&#10;Ex: gato; cat; I have a cat" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-56 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-[10px]"></textarea>
                             <button onclick="saveBulkCards()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold mt-4">Importar Todos</button>
                         `}
                     </div>
