@@ -18,7 +18,7 @@
         
         body { 
             -webkit-tap-highlight-color: transparent; 
-            padding-top: calc(var(--sat) + 70px);
+            padding-top: calc(var(--sat) + 50px);
             padding-bottom: calc(var(--sab) + 0px);
             background-color: #f8fafc;
             min-height: 100vh;
@@ -80,14 +80,23 @@
         const saveDecks = () => localStorage.setItem('srs_v21_decks', JSON.stringify(decks));
         const saveConfig = () => localStorage.setItem('srs_config_v21', JSON.stringify(config));
         
-        const formatDate = (dateStr) => {
-            const date = new Date(dateStr);
+        // --- LÓGICA DE DATA ---
+        const getStartOfToday = () => {
             const now = new Date();
-            const diffMs = date - now;
-            const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+            now.setHours(0, 0, 0, 0);
+            return now;
+        };
+
+        const formatDate = (dateStr) => {
+            const dueDate = new Date(dateStr);
+            const today = getStartOfToday();
+            const dateOnly = new Date(dueDate);
+            dateOnly.setHours(0,0,0,0);
+            const diffMs = dateOnly - today;
+            const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
             if (diffDays <= 0) return "Hoje";
             if (diffDays === 1) return "Amanhã";
-            return `em ${diffDays} d (${date.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})})`;
+            return `em ${diffDays} d (${dueDate.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})})`;
         };
 
         const isNewCard = (card) => !card.wasViewed;
@@ -110,6 +119,15 @@
             }
             studyQueue = result;
         };
+
+        // --- ATUALIZAÇÃO AUTOMÁTICA SILENCIOSA ---
+        setInterval(() => {
+            if (view === 'home') render(); 
+        }, 30000);
+
+        window.addEventListener('focus', () => {
+            render();
+        });
 
         function speak(text, callback) {
             if (!text) { if(callback) callback(); return; }
@@ -151,18 +169,18 @@
                             <p class="text-slate-400 font-medium">Nenhum baralho encontrado.</p>
                         </div>
                     ` : decks.map(deck => {
-                        const total = deck.cards.length;
                         const novos = deck.cards.filter(c => isNewCard(c)).length;
                         const revisar = deck.cards.filter(c => !isNewCard(c) && new Date(c.dueDate) <= new Date()).length;
+                        const total = deck.cards.length;
                         
                         return `
                         <div onclick="openDeck(${deck.id})" class="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex justify-between items-center active:scale-95 transition-all cursor-pointer">
                             <div class="flex-1 truncate pr-4">
                                 <h2 class="text-xl font-bold text-slate-800 truncate mb-2">${deck.name}</h2>
-                                <div class="flex gap-2">
+                                <div class="flex flex-wrap gap-2">
                                     <span class="bg-indigo-50 text-indigo-600 text-[9px] font-black px-2 py-1 rounded-lg uppercase">Novos: ${novos}</span>
                                     <span class="bg-emerald-50 text-emerald-600 text-[9px] font-black px-2 py-1 rounded-lg uppercase">Revisar: ${revisar}</span>
-                                    <span class="bg-slate-50 text-slate-400 text-[9px] font-black px-2 py-1 rounded-lg uppercase">Total: ${total}</span>
+                                    <span class="bg-slate-100 text-slate-400 text-[9px] font-black px-2 py-1 rounded-lg uppercase">Total: ${total}</span>
                                 </div>
                             </div>
                             <div class="flex gap-1">
@@ -183,7 +201,7 @@
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
                     <div class="bg-white rounded-[40px] p-8 w-full max-sm modal-enter">
                         <h2 class="text-xl font-black text-slate-800 mb-6 uppercase text-center">Novo Baralho</h2>
-                        <input id="deckNameInput" placeholder="Ex: Inglês Básico" class="w-full bg-slate-50 border-0 rounded-2xl p-4 mb-4 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <input id="deckNameInput" placeholder="Ex: Inglês" class="w-full bg-slate-50 border-0 rounded-2xl p-4 mb-4 focus:ring-2 focus:ring-indigo-500 outline-none">
                         <div class="flex gap-2">
                             <button onclick="showAddDeckModal=false; render();" class="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold">Voltar</button>
                             <button onclick="createNewDeck()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold">Criar</button>
@@ -352,7 +370,6 @@
             const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             const cIdx = decks[dIdx].cards.findIndex(c => String(c.id) === String(currentCard.id));
             let { interval, repetition, efactor } = decks[dIdx].cards[cIdx];
-            
             decks[dIdx].cards[cIdx].wasViewed = true;
 
             if (q >= 3) {
@@ -366,13 +383,13 @@
             }
 
             efactor = Math.max(1.3, efactor + (0.1 - (5-q)*(0.08 + (5-q)*0.02)));
-            const newDate = new Date(); 
-            newDate.setDate(newDate.getDate() + interval);
+            const nextDate = getStartOfToday(); 
+            nextDate.setDate(nextDate.getDate() + interval);
             
             decks[dIdx].cards[cIdx].interval = interval;
             decks[dIdx].cards[cIdx].repetition = repetition;
             decks[dIdx].cards[cIdx].efactor = efactor;
-            decks[dIdx].cards[cIdx].dueDate = newDate.toISOString();
+            decks[dIdx].cards[cIdx].dueDate = nextDate.toISOString();
             
             saveDecks(); 
             isFlipped = false; 
@@ -392,7 +409,6 @@
 
         function deleteDeck(id) { if(confirm('Excluir este baralho permanentemente?')){ decks = decks.filter(d => String(d.id) !== String(id)); saveDecks(); render(); } }
 
-        // --- CORREÇÃO DO FILTRO ---
         function handleSearch(val) {
             searchTerm = val;
             const listContainer = document.getElementById('cardsListContainer');
@@ -529,21 +545,13 @@
             const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             const cIdx = decks[dIdx].cards.findIndex(c => String(c.id) === String(editingCardId));
             if(cIdx === -1) return;
-            
             decks[dIdx].cards[cIdx].f = document.getElementById('editF').value.trim();
             if (decks[dIdx].cards[cIdx].type !== 'cloze') decks[dIdx].cards[cIdx].b = document.getElementById('editB').value.trim();
             if (decks[dIdx].cards[cIdx].type === 'complete') decks[dIdx].cards[cIdx].ex = document.getElementById('editEx').value.trim();
             if (decks[dIdx].cards[cIdx].type === 'cloze') decks[dIdx].cards[cIdx].hint = document.getElementById('editHint').value.trim();
-            
             saveDecks(); 
             showEditCardModal = false; 
-            if (isEditingFromStudy) {
-                refreshStudyQueue(); 
-                render();
-            } else { 
-                showManageCardsModal = true; 
-                render(); 
-            }
+            if (isEditingFromStudy) { refreshStudyQueue(); render(); } else { showManageCardsModal = true; render(); }
         }
 
         function deleteCard(id, fromEditor = false) {
@@ -551,25 +559,15 @@
             const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             decks[dIdx].cards = decks[dIdx].cards.filter(c => String(c.id) !== String(id));
             saveDecks(); 
-            
             if (fromEditor) {
                 showEditCardModal = false;
-                if (isEditingFromStudy) {
-                    refreshStudyQueue();
-                } else {
-                    showManageCardsModal = true;
-                }
-            } else if (view === 'study') {
-                refreshStudyQueue();
-            }
+                if (isEditingFromStudy) refreshStudyQueue(); else showManageCardsModal = true;
+            } else if (view === 'study') refreshStudyQueue();
             render();
         }
 
         function startPreviewCard(id) {
-            previewingCardId = id;
-            showPreviewCardModal = true;
-            showManageCardsModal = false;
-            render();
+            previewingCardId = id; showPreviewCardModal = true; showManageCardsModal = false; render();
         }
 
         function renderPreviewCardModal() {
@@ -622,10 +620,7 @@
                     });
                 }
             });
-            saveDecks(); 
-            showAddCardModal = false; 
-            refreshStudyQueue();
-            render();
+            saveDecks(); showAddCardModal = false; refreshStudyQueue(); render();
         }
 
         function saveSingleCard() {
@@ -641,23 +636,16 @@
             };
             const idx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             decks[idx].cards.push(cardData);
-            saveDecks(); 
-            showAddCardModal = false; 
-            refreshStudyQueue();
-            render();
+            saveDecks(); showAddCardModal = false; refreshStudyQueue(); render();
         }
 
         function renderExportModal() {
             const deck = decks.find(d => String(d.id) === String(currentDeckId));
             const exportText = deck.cards.map(c => {
-                if (c.type === 'cloze') {
-                    const hintValue = c.hint ? c.hint.trim() : "";
-                    return `${c.f.trim()};${hintValue}`;
-                }
+                if (c.type === 'cloze') return `${c.f.trim()};${(c.hint || "").trim()}`;
                 let parts = [c.f.trim()];
                 if (c.b) parts.push(c.b.trim());
                 if (c.ex) parts.push(c.ex.trim());
-                if (c.hint && c.type !== 'cloze') parts.push(c.hint.trim());
                 return parts.join(';');
             }).join('\n');
 
@@ -665,7 +653,6 @@
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-6">
                     <div class="bg-white rounded-[40px] p-8 w-full max-w-sm modal-enter shadow-2xl">
                         <h2 class="text-xl font-black text-slate-800 mb-2 uppercase">Exportar Dados</h2>
-                        <p class="text-[10px] text-slate-400 font-bold mb-4 uppercase">Copia e cola no seu arquivo de backup</p>
                         <textarea readonly onclick="this.select()" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-56 font-mono text-[10px] mb-4 outline-none focus:ring-2 focus:ring-indigo-500">${exportText}</textarea>
                         <button onclick="showExportModal=false; render();" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold active:scale-95 transition-transform">Fechar</button>
                     </div>
