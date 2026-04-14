@@ -70,10 +70,11 @@
         let showStudyConfigModal = false;
         
         let editingCardId = null;
+        let isEditingFromStudy = false;
         let previewingCardId = null;
         let renamingDeckId = null;
         let addMode = 'single'; 
-        let cardSubtype = 'basic'; 
+        let cardSubtype = 'cloze'; 
         let searchTerm = '';
 
         const saveDecks = () => localStorage.setItem('srs_v21_decks', JSON.stringify(decks));
@@ -221,7 +222,7 @@
                         <h2 class="text-xl font-black text-slate-800 mb-6 uppercase text-center">Configurações de Estudo</h2>
                         <div class="space-y-6">
                             <div>
-                                <p class="text-[10px] font-black text-slate-400 uppercase mb-3">Prioridade de Estudo</p>
+                                <p class="text-[10px] font-black text-slate-400 uppercase mb-3">Prioridade de Carga</p>
                                 <div class="grid grid-cols-2 gap-2">
                                     <button onclick="config.prioritizeNew=false; saveConfig(); refreshStudyQueue(); render();" class="py-3 px-2 rounded-2xl text-[10px] font-bold border ${!config.prioritizeNew ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-50 border-slate-100 text-slate-500'}">Revisões Primeiro</button>
                                     <button onclick="config.prioritizeNew=true; saveConfig(); refreshStudyQueue(); render();" class="py-3 px-2 rounded-2xl text-[10px] font-bold border ${config.prioritizeNew ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-50 border-slate-100 text-slate-500'}">Novos Primeiro</button>
@@ -247,7 +248,7 @@
                 <div class="flex justify-between items-center mb-6">
                     <button onclick="view='home'; render();" class="text-slate-400 font-bold text-xs uppercase tracking-widest">← Início</button>
                     <div class="flex gap-2">
-                        <button onclick="showStudyConfigModal=true; render();" class="bg-slate-100 text-slate-600 px-3 py-2 rounded-xl font-bold text-xs">Settings</button>
+                        <button onclick="showStudyConfigModal=true; render();" class="bg-slate-100 text-slate-600 px-3 py-2 rounded-xl font-bold text-xs">Ordem</button>
                         <button onclick="showManageCardsModal=true; searchTerm=''; render();" class="bg-slate-100 text-slate-600 px-3 py-2 rounded-xl font-bold text-xs">Lista</button>
                         <button onclick="showAddCardModal=true; render();" class="bg-indigo-600 text-white px-3 py-2 rounded-xl font-bold text-xs shadow-md">+ Novo</button>
                     </div>
@@ -445,14 +446,73 @@
             render(); 
         }
 
+        function renderEditCardModal() {
+            const dIdx = decks.findIndex(d => d.id === currentDeckId);
+            const card = decks[dIdx].cards.find(c => String(c.id) === String(editingCardId));
+            if (!card) return '';
+
+            return `
+                <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
+                    <div class="bg-white rounded-t-[40px] sm:rounded-[40px] p-8 w-full max-w-sm overflow-y-auto max-h-[95vh] modal-enter relative">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-xl font-black text-slate-800 uppercase">Editar Card</h2>
+                            <div class="flex items-center gap-2">
+                                <button onclick="deleteCard('${card.id}', true)" class="text-rose-500 p-2 active:scale-90 transition-transform" title="Excluir">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                                <button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; render();" class="text-slate-300 text-3xl">&times;</button>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Frente / Frase</p>
+                                <textarea id="editF" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 focus:ring-2 focus:ring-indigo-500 outline-none">${card.f}</textarea>
+                            </div>
+                            
+                            ${card.type !== 'cloze' ? `
+                                <div>
+                                    <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Verso (Tradução)</p>
+                                    <textarea id="editB" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none">${card.b || ''}</textarea>
+                                </div>
+                            ` : ''}
+
+                            ${card.type === 'complete' ? `
+                                <div>
+                                    <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Frase Exemplo</p>
+                                    <textarea id="editEx" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none">${card.ex || ''}</textarea>
+                                </div>
+                            ` : ''}
+
+                            ${card.type === 'cloze' ? `
+                                <div>
+                                    <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Dica (Significado)</p>
+                                    <input id="editHint" value="${card.hint || ''}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                </div>
+                            ` : ''}
+
+                            <div class="grid grid-cols-2 gap-2 mt-6">
+                                <button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; render();" class="bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold">Cancelar</button>
+                                <button onclick="saveEditedCard()" class="bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-md">Salvar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         function saveEditedCard() {
             const dIdx = decks.findIndex(d => d.id === currentDeckId);
             const cIdx = decks[dIdx].cards.findIndex(c => String(c.id) === String(editingCardId));
             if(cIdx === -1) return;
+            
             decks[dIdx].cards[cIdx].f = document.getElementById('editF').value.trim();
             if (decks[dIdx].cards[cIdx].type !== 'cloze') decks[dIdx].cards[cIdx].b = document.getElementById('editB').value.trim();
             if (decks[dIdx].cards[cIdx].type === 'complete') decks[dIdx].cards[cIdx].ex = document.getElementById('editEx').value.trim();
             if (decks[dIdx].cards[cIdx].type === 'cloze') decks[dIdx].cards[cIdx].hint = document.getElementById('editHint').value.trim();
+            
             saveDecks(); 
             showEditCardModal = false; 
             if (isEditingFromStudy) {
@@ -464,12 +524,22 @@
             }
         }
 
-        function deleteCard(id) {
-            if(!confirm('Excluir este card?')) return;
+        function deleteCard(id, fromEditor = false) {
+            if(!confirm('Excluir este card permanentemente?')) return;
             const dIdx = decks.findIndex(d => d.id === currentDeckId);
             decks[dIdx].cards = decks[dIdx].cards.filter(c => String(c.id) !== String(id));
             saveDecks(); 
-            if (view === 'study') refreshStudyQueue();
+            
+            if (fromEditor) {
+                showEditCardModal = false;
+                if (isEditingFromStudy) {
+                    refreshStudyQueue();
+                } else {
+                    showManageCardsModal = true;
+                }
+            } else if (view === 'study') {
+                refreshStudyQueue();
+            }
             render();
         }
 
@@ -485,8 +555,6 @@
                     let type = 'basic';
                     if (f.includes('[') && f.includes(']')) {
                         type = 'cloze';
-                        // No seu formato: Frase [lacuna] ; Significado
-                        // Significado vai para a Hint
                         if (b && !hint) hint = b;
                         b = '';
                     } else if (ex) {
@@ -530,26 +598,22 @@
         function renderExportModal() {
             const deck = decks.find(d => d.id === currentDeckId);
             const exportText = deck.cards.map(c => {
-                // FORMATO PERSONALIZADO PARA CLOZE
                 if (c.type === 'cloze') {
-                    // Retorna estritamente: frase [termo] ; significado
-                    const hintValue = c.hint || "";
-                    return `${c.f} ; ${hintValue}`;
+                    const hintValue = c.hint ? c.hint.trim() : "";
+                    return `${c.f.trim()};${hintValue}`;
                 }
-                
-                // FORMATO PADRÃO PARA OUTROS
-                let parts = [c.f];
-                if (c.b) parts.push(c.b);
-                if (c.ex) parts.push(c.ex);
-                if (c.hint && c.type !== 'cloze') parts.push(c.hint);
-                return parts.join(' ; ');
+                let parts = [c.f.trim()];
+                if (c.b) parts.push(c.b.trim());
+                if (c.ex) parts.push(c.ex.trim());
+                if (c.hint && c.type !== 'cloze') parts.push(c.hint.trim());
+                return parts.join(';');
             }).join('\n');
 
             return `
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-6">
                     <div class="bg-white rounded-[40px] p-8 w-full max-w-sm modal-enter shadow-2xl">
                         <h2 class="text-xl font-black text-slate-800 mb-2 uppercase">Exportar Dados</h2>
-                        <p class="text-[10px] text-slate-400 font-bold mb-4 uppercase">Copie o texto para o seu arquivo .txt</p>
+                        <p class="text-[10px] text-slate-400 font-bold mb-4 uppercase">Copia e cola no seu arquivo de backup</p>
                         <textarea readonly onclick="this.select()" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-56 font-mono text-[10px] mb-4 outline-none focus:ring-2 focus:ring-indigo-500">${exportText}</textarea>
                         <button onclick="showExportModal=false; render();" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold active:scale-95 transition-transform">Fechar</button>
                     </div>
@@ -567,7 +631,7 @@
                         </div>
                         <div class="flex bg-slate-100 p-1 rounded-2xl mb-6 text-[10px] font-black uppercase">
                             <button onclick="addMode='single'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='single'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Individual</button>
-                            <button onclick="addMode='bulk'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Bulk</button>
+                            <button onclick="addMode='bulk'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Importar (;)</button>
                         </div>
                         ${addMode === 'single' ? `
                             <div class="grid grid-cols-3 gap-1 mb-6">
@@ -576,14 +640,14 @@
                                 <button onclick="cardSubtype='cloze' ; render();" class="text-[8px] font-black uppercase py-2 border rounded-lg ${cardSubtype==='cloze'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-100 text-slate-400'}">Lacuna</button>
                             </div>
                             <div class="space-y-4">
-                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [lacuna]' : 'Frente'}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [termo]' : 'Frente do Card'}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
                                 ${cardSubtype !== 'cloze' ? `<textarea id="newB" placeholder="Verso (Tradução)" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>` : ''}
                                 ${cardSubtype === 'complete' ? `<textarea id="newEx" placeholder="Frase de Exemplo" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>` : ''}
                                 ${cardSubtype === 'cloze' ? `<input id="newHint" placeholder="Dica (Significado)" class="w-full bg-slate-50 border-0 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none">` : ''}
                                 <button onclick="saveSingleCard()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-md">Adicionar</button>
                             </div>
                         ` : `
-                            <textarea id="bulkData" placeholder="Ex: café; coffee&#10Ex: café; coffee; I drink coffee&#10Ex: I drink [coffee] ; café" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-56 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-[10px]"></textarea>
+                            <textarea id="bulkData" placeholder="Ex: I drink [coffee];café" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-56 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-[10px]"></textarea>
                             <button onclick="saveBulkCards()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold mt-4">Importar</button>
                         `}
                     </div>
