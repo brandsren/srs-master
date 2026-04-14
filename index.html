@@ -40,6 +40,10 @@
             margin: 0 4px;
             border-bottom: 2px solid #818cf8;
         }
+
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
     </style>
 </head>
 <body class="text-slate-900 font-sans">
@@ -47,8 +51,8 @@
 
     <script>
         // --- Estado Global ---
-        let decks = JSON.parse(localStorage.getItem('srs_v8_decks') || '[]');
-        let config = JSON.parse(localStorage.getItem('srs_config_v8') || '{"autoFront": true, "autoBack": true}');
+        let decks = JSON.parse(localStorage.getItem('srs_v21_decks') || '[]');
+        let config = JSON.parse(localStorage.getItem('srs_config_v21') || '{"autoFront": true, "autoBack": true, "shuffle": false, "prioritizeNew": false}');
         
         let view = 'home'; 
         let currentDeckId = null;
@@ -62,6 +66,7 @@
         let showManageCardsModal = false;
         let showPreviewCardModal = false;
         let showExportModal = false;
+        let showStudyConfigModal = false;
         
         let editingCardId = null;
         let previewingCardId = null;
@@ -70,12 +75,35 @@
         let cardSubtype = 'basic'; 
         let searchTerm = '';
 
-        const saveDecks = () => localStorage.setItem('srs_v8_decks', JSON.stringify(decks));
-        const saveConfig = () => localStorage.setItem('srs_config_v8', JSON.stringify(config));
+        const saveDecks = () => localStorage.setItem('srs_v21_decks', JSON.stringify(decks));
+        const saveConfig = () => localStorage.setItem('srs_config_v21', JSON.stringify(config));
         
+        const formatDate = (dateStr) => {
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diffMs = date - now;
+            const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+            if (diffDays <= 0) return "Hoje";
+            if (diffDays === 1) return "Amanhã";
+            return `em ${diffDays} d (${date.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})})`;
+        };
+
         const getDueCards = (deck) => {
             if (!deck || !deck.cards) return [];
-            return deck.cards.filter(c => new Date(c.dueDate) <= new Date());
+            let allDue = deck.cards.filter(c => new Date(c.dueDate) <= new Date());
+            
+            const newCards = allDue.filter(c => c.repetition === 0);
+            const reviewCards = allDue.filter(c => c.repetition > 0);
+
+            let result = config.prioritizeNew ? [...newCards, ...reviewCards] : [...reviewCards, ...newCards];
+
+            if (config.shuffle) {
+                for (let i = result.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [result[i], result[j]] = [result[j], result[i]];
+                }
+            }
+            return result;
         };
 
         function speak(text, callback) {
@@ -117,17 +145,21 @@
                             <p class="text-slate-400 font-medium">Nenhum baralho encontrado.</p>
                         </div>
                     ` : decks.map(deck => {
-                        const dueCount = getDueCards(deck).length;
-                        const totalCount = deck.cards ? deck.cards.length : 0;
+                        const total = deck.cards.length;
+                        const novos = deck.cards.filter(c => c.repetition === 0).length;
+                        const revisar = deck.cards.filter(c => c.repetition > 0 && new Date(c.dueDate) <= new Date()).length;
+                        
                         return `
                         <div onclick="openDeck(${deck.id})" class="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex justify-between items-center active:scale-95 transition-all cursor-pointer">
                             <div class="flex-1 truncate pr-4">
-                                <h2 class="text-xl font-bold text-slate-800 truncate">${deck.name}</h2>
-                                <p class="text-[11px] font-medium ${dueCount > 0 ? 'text-indigo-500' : 'text-slate-400'}">
-                                    ${dueCount} revisões • <span class="text-slate-400">${totalCount} cards total</span>
-                                </p>
+                                <h2 class="text-xl font-bold text-slate-800 truncate mb-2">${deck.name}</h2>
+                                <div class="flex gap-2">
+                                    <span class="bg-indigo-50 text-indigo-600 text-[9px] font-black px-2 py-1 rounded-lg uppercase">Novos: ${novos}</span>
+                                    <span class="bg-emerald-50 text-emerald-600 text-[9px] font-black px-2 py-1 rounded-lg uppercase">Revisar: ${revisar}</span>
+                                    <span class="bg-slate-50 text-slate-400 text-[9px] font-black px-2 py-1 rounded-lg uppercase">Total: ${total}</span>
+                                </div>
                             </div>
-                            <div class="flex gap-2">
+                            <div class="flex gap-1">
                                 <button onclick="event.stopPropagation(); startRenameDeck(${deck.id})" class="text-slate-300 hover:text-indigo-500 p-2 text-lg">✏️</button>
                                 <button onclick="event.stopPropagation(); if(confirm('Excluir baralho?')) deleteDeck(${deck.id})" class="text-slate-300 hover:text-red-500 p-2 text-xl">&times;</button>
                             </div>
@@ -143,7 +175,7 @@
         function renderAddDeckModal() {
             return `
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-                    <div class="bg-white rounded-[40px] p-8 w-full max-w-sm modal-enter">
+                    <div class="bg-white rounded-[40px] p-8 w-full max-sm modal-enter">
                         <h2 class="text-xl font-black text-slate-800 mb-6 uppercase text-center">Novo Baralho</h2>
                         <input id="deckNameInput" placeholder="Ex: Inglês Básico" class="w-full bg-slate-50 border-0 rounded-2xl p-4 mb-4 focus:ring-2 focus:ring-indigo-500 outline-none">
                         <div class="flex gap-2">
@@ -180,33 +212,31 @@
             }
         }
 
-        /**
-         * FUNÇÃO DE EXCLUSÃO RÁPIDA (USADA PELO BOTÃO X NO CARD)
-         */
-        function quickDeleteCard(cardId) {
-            if(!confirm('Deseja excluir este card permanentemente?')) return;
-            
-            const deck = decks.find(d => d.id === currentDeckId);
-            if (!deck) return;
-
-            const cardIndex = deck.cards.findIndex(c => Number(c.id) === Number(cardId));
-            
-            if (cardIndex > -1) {
-                deck.cards.splice(cardIndex, 1);
-                saveDecks();
-                
-                // Reseta estado de visualização
-                isFlipped = false;
-                showHint = false;
-                
-                // Se houver próximo card, fala o áudio
-                const nextDue = getDueCards(deck);
-                if (config.autoFront && nextDue.length > 0) {
-                    setTimeout(() => speak(nextDue[0].f), 450);
-                }
-                
-                render();
-            }
+        function renderStudyConfigModal() {
+            return `
+                <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+                    <div class="bg-white rounded-[40px] p-8 w-full max-w-sm modal-enter">
+                        <h2 class="text-xl font-black text-slate-800 mb-6 uppercase text-center">Configurações de Estudo</h2>
+                        <div class="space-y-6">
+                            <div>
+                                <p class="text-[10px] font-black text-slate-400 uppercase mb-3">Prioridade</p>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <button onclick="config.prioritizeNew=false; saveConfig(); render();" class="py-3 px-2 rounded-2xl text-[10px] font-bold border ${!config.prioritizeNew ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-50 border-slate-100 text-slate-500'}">Revisões</button>
+                                    <button onclick="config.prioritizeNew=true; saveConfig(); render();" class="py-3 px-2 rounded-2xl text-[10px] font-bold border ${config.prioritizeNew ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-50 border-slate-100 text-slate-500'}">Novos</button>
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-black text-slate-400 uppercase mb-3">Ordem</p>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <button onclick="config.shuffle=false; saveConfig(); render();" class="py-3 px-2 rounded-2xl text-[10px] font-bold border ${!config.shuffle ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-50 border-slate-100 text-slate-500'}">Sequencial</button>
+                                    <button onclick="config.shuffle=true; saveConfig(); render();" class="py-3 px-2 rounded-2xl text-[10px] font-bold border ${config.shuffle ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-50 border-slate-100 text-slate-500'}">Aleatória</button>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="showStudyConfigModal=false; render();" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold mt-8">Salvar</button>
+                    </div>
+                </div>
+            `;
         }
 
         function renderStudy(root) {
@@ -218,8 +248,9 @@
                 <div class="flex justify-between items-center mb-6">
                     <button onclick="view='home'; render();" class="text-slate-400 font-bold text-xs uppercase tracking-widest">← Início</button>
                     <div class="flex gap-2">
-                        <button onclick="showManageCardsModal=true; searchTerm=''; render();" class="bg-slate-100 text-slate-600 px-4 py-2 rounded-xl font-bold text-xs">Lista</button>
-                        <button onclick="showAddCardModal=true; render();" class="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-md">+ Novo</button>
+                        <button onclick="showStudyConfigModal=true; render();" class="bg-slate-100 text-slate-600 px-3 py-2 rounded-xl font-bold text-xs">⚙️</button>
+                        <button onclick="showManageCardsModal=true; searchTerm=''; render();" class="bg-slate-100 text-slate-600 px-3 py-2 rounded-xl font-bold text-xs">Lista</button>
+                        <button onclick="showAddCardModal=true; render();" class="bg-indigo-600 text-white px-3 py-2 rounded-xl font-bold text-xs shadow-md">+ Novo</button>
                     </div>
                 </div>
 
@@ -234,34 +265,26 @@
                     </div>
 
                     <div class="relative h-[430px] w-full perspective-1000">
-                        <div class="relative w-full h-full preserve-3d ${isFlipped ? 'rotate-y-180' : ''}" onclick="handleFlip()">
+                        <div class="relative w-full h-full preserve-3d ${isFlipped ? 'rotate-y-180' : ''}" onclick="handleFlipToggle()">
                             <!-- FRENTE -->
                             <div class="absolute inset-0 backface-hidden bg-white border border-slate-100 rounded-[40px] shadow-sm flex flex-col items-center justify-center p-8 text-center">
                                 <div class="absolute top-6 right-6 flex items-center gap-1">
                                     <button onclick="event.stopPropagation(); startEditCard('${card.id}', true)" class="text-slate-300 text-lg p-2 active:scale-90 transition-transform">✏️</button>
-                                    <button onclick="event.stopPropagation(); quickDeleteCard('${card.id}')" class="text-slate-300 text-2xl p-2 active:scale-90 transition-transform">×</button>
                                 </div>
-                                
                                 <span class="absolute top-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                                    ${card.type === 'cloze' ? 'Tipo: Lacuna' : 'Flashcard'}
+                                    ${card.repetition === 0 ? 'Card Novo' : 'Revisão'}
                                 </span>
                                 <div class="text-2xl font-bold text-slate-800 leading-tight">
                                     ${card.type === 'cloze' ? card.f.replace(/\[(.*?)\]/g, '<span class="cloze-placeholder">...</span>') : card.f}
                                 </div>
-                                ${card.type === 'cloze' && card.hint ? `
-                                    <div class="mt-8">
-                                        ${showHint ? `<div class="text-xs font-bold text-indigo-500 bg-indigo-50 px-6 py-3 rounded-2xl italic">Dica: ${card.hint}</div>` : `<button onclick="event.stopPropagation(); showHint=true; render();" class="text-[10px] font-black uppercase tracking-tighter text-slate-400 border border-slate-200 px-4 py-2 rounded-full">💡 Dica</button>`}
-                                    </div>
-                                ` : ''}
+                                ${card.type === 'cloze' && card.hint ? `<div class="mt-8">${showHint ? `<div class="text-xs font-bold text-indigo-500 bg-indigo-50 px-6 py-3 rounded-2xl italic">Dica: ${card.hint}</div>` : `<button onclick="event.stopPropagation(); showHint=true; render();" class="text-[10px] font-black uppercase tracking-tighter text-slate-400 border border-slate-200 px-4 py-2 rounded-full">💡 Dica</button>`}</div>` : ''}
                             </div>
                             
                             <!-- VERSO -->
                             <div class="absolute inset-0 backface-hidden bg-indigo-600 border border-indigo-700 rounded-[40px] shadow-xl flex flex-col items-center justify-center p-8 text-center rotate-y-180">
                                 <div class="absolute top-6 right-6 flex items-center gap-1">
-                                    <button onclick="event.stopPropagation(); startEditCard('${card.id}', true)" class="text-indigo-400 text-lg p-2 active:scale-90 transition-transform">✏️</button>
-                                    <button onclick="event.stopPropagation(); quickDeleteCard('${card.id}')" class="text-indigo-400 text-2xl p-2 active:scale-90 transition-transform">×</button>
+                                    <button onclick="event.stopPropagation(); startEditCard('${card.id}', true)" class="text-indigo-300 text-lg p-2 active:scale-90 transition-transform">✏️</button>
                                 </div>
-
                                 <div class="text-2xl font-bold text-white mb-6">
                                     ${card.type === 'cloze' ? card.f.replace(/\[(.*?)\]/g, '<span class="text-yellow-300 underline">$1</span>') : card.b}
                                 </div>
@@ -292,69 +315,44 @@
                 ${showEditCardModal ? renderEditCardModal() : ''}
                 ${showPreviewCardModal ? renderPreviewCardModal() : ''}
                 ${showExportModal ? renderExportModal() : ''}
+                ${showStudyConfigModal ? renderStudyConfigModal() : ''}
             `;
         }
 
-        function createNewDeck() {
-            const name = document.getElementById('deckNameInput').value.trim();
-            if (name) { decks.push({ id: Date.now(), name, cards: [] }); saveDecks(); showAddDeckModal = false; render(); }
-        }
-
-        function deleteDeck(id) { decks = decks.filter(d => d.id !== id); saveDecks(); render(); }
-
-        function openDeck(id) {
-            currentDeckId = id; view = 'study'; isFlipped = false; showHint = false; render();
-            const deck = decks.find(d => d.id === currentDeckId);
-            const due = getDueCards(deck);
-            if (config.autoFront && due.length > 0) speak(due[0].f);
-        }
-
-        function handleFlip() {
-            if (isFlipped) return;
-            isFlipped = true; render();
-            if (config.autoBack) {
+        function handleFlipToggle() {
+            isFlipped = !isFlipped;
+            render();
+            if (isFlipped && config.autoBack) {
                 const deck = decks.find(d => d.id === currentDeckId);
                 const due = getDueCards(deck);
                 if(due[0]) triggerVersoAudio(due[0].id);
             }
         }
 
-        function triggerVersoAudio(cardId) {
-            const deck = decks.find(d => d.id === currentDeckId);
-            const card = deck.cards.find(c => String(c.id) === String(cardId));
-            if (!card) return;
-            const mainText = card.type === 'cloze' ? card.f : card.b;
-            speak(mainText, () => {
-                if (card.ex) setTimeout(() => speak(card.ex), 1000);
-            });
-        }
-
         function renderManageCardsModal() {
             const deck = decks.find(d => d.id === currentDeckId);
             const filteredCards = deck.cards.filter(c => 
                 c.f.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                (c.b && c.b.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (c.ex && c.ex.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (c.hint && c.hint.toLowerCase().includes(searchTerm.toLowerCase()))
+                (c.b && c.b.toLowerCase().includes(searchTerm.toLowerCase()))
             );
 
             return `
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div class="bg-white rounded-[40px] p-8 w-full max-w-lg h-[80vh] flex flex-col modal-enter">
+                    <div class="bg-white rounded-[40px] p-8 w-full max-w-lg h-[90vh] flex flex-col modal-enter overflow-hidden">
                         <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-black text-slate-800 uppercase">Lista de Cartões</h2>
+                            <h2 class="text-xl font-black text-slate-800 uppercase">Cartões e Agenda</h2>
                             <button onclick="showManageCardsModal=false; render();" class="text-slate-300 text-3xl">&times;</button>
                         </div>
                         
                         <div class="flex gap-2 mb-4">
                             <div class="relative flex-1">
-                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
-                                <input id="searchInput" oninput="searchTerm=this.value; renderManageCardsModalUI()" value="${searchTerm}" placeholder="Buscar palavra..." class="w-full bg-slate-50 border-0 rounded-2xl py-3 pl-10 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+                                <input id="searchInput" oninput="searchTerm=this.value; renderManageCardsModalUI()" value="${searchTerm}" placeholder="Filtrar cards..." class="w-full bg-slate-50 border-0 rounded-2xl py-3 pl-10 pr-4 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
                             </div>
-                            <button onclick="showExportModal=true; render();" class="bg-slate-100 text-slate-600 px-4 rounded-2xl font-bold text-xs">Exportar</button>
+                            <button onclick="showExportModal=true; render();" class="bg-slate-100 text-slate-600 px-4 rounded-2xl font-bold text-[10px]">Exportar</button>
                         </div>
 
-                        <div id="cardsListContainer" class="overflow-y-auto flex-1 space-y-3">
+                        <div id="cardsListContainer" class="overflow-y-auto flex-1 space-y-3 custom-scroll pr-1">
                             ${renderCardsList(filteredCards)}
                         </div>
                     </div>
@@ -366,50 +364,58 @@
             const deck = decks.find(d => d.id === currentDeckId);
             const filteredCards = deck.cards.filter(c => 
                 c.f.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                (c.b && c.b.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (c.ex && c.ex.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (c.hint && c.hint.toLowerCase().includes(searchTerm.toLowerCase()))
+                (c.b && c.b.toLowerCase().includes(searchTerm.toLowerCase()))
             );
             document.getElementById('cardsListContainer').innerHTML = renderCardsList(filteredCards);
         }
 
         function renderCardsList(cards) {
-            if (cards.length === 0) return `<p class="text-center py-10 text-slate-400 text-sm">Nenhum card encontrado.</p>`;
-            return cards.map(c => `
-                <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
-                    <div class="truncate pr-4">
-                        <div class="text-[8px] font-black uppercase text-indigo-500 mb-1">Tipo ${c.type === 'cloze' ? '3' : (c.type === 'complete' ? '2' : '1')}</div>
-                        <div class="font-bold text-slate-800 truncate">${c.f}</div>
+            if (cards.length === 0) return `<p class="text-center py-10 text-slate-400 text-sm">Nenhum card.</p>`;
+            return cards.map(c => {
+                const typeLabel = c.type === 'basic' ? 'C1' : (c.type === 'complete' ? 'C2' : 'L');
+                return `
+                <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center group">
+                    <div class="truncate pr-4 flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-[7px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">${typeLabel}</span>
+                            <span class="text-[7px] font-black uppercase px-2 py-0.5 rounded-full ${c.repetition === 0 ? 'bg-indigo-100 text-indigo-600' : 'bg-emerald-100 text-emerald-600'}">
+                                ${c.repetition === 0 ? 'Novo' : 'Revisão'}
+                            </span>
+                            <span class="text-[7px] font-bold text-slate-400 uppercase tracking-tighter">
+                                ${formatDate(c.dueDate)}
+                            </span>
+                        </div>
+                        <div class="font-bold text-slate-800 truncate text-sm">${c.f}</div>
                     </div>
                     <div class="flex gap-3 flex-shrink-0 items-center">
-                        <button onclick="startPreviewCard('${c.id}')" class="text-slate-400">👁️</button>
-                        <button onclick="startEditCard('${c.id}', false)" class="text-slate-400">✏️</button>
-                        <button onclick="deleteCard('${c.id}')" class="text-slate-300 text-xl font-bold">&times;</button>
+                        <button onclick="startPreviewCard('${c.id}')" class="text-slate-400 text-sm">👁️</button>
+                        <button onclick="startEditCard('${c.id}', false)" class="text-slate-400 text-sm">✏️</button>
+                        <button onclick="deleteCard('${c.id}')" class="text-slate-300 text-lg font-bold">&times;</button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
-        function renderExportModal() {
-            const deck = decks.find(d => d.id === currentDeckId);
-            const exportText = deck.cards.map(c => {
-                if (c.type === 'cloze') return `${c.f} ; ${c.hint || ''}`;
-                if (c.type === 'complete') return `${c.f} ; ${c.b} ; ${c.ex}`;
-                return `${c.f} ; ${c.b}`;
-            }).join('\n');
+        function createNewDeck() {
+            const name = document.getElementById('deckNameInput').value.trim();
+            if (name) { decks.push({ id: Date.now(), name, cards: [] }); saveDecks(); showAddDeckModal = false; render(); }
+        }
 
-            return `
-                <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-6">
-                    <div class="bg-white rounded-[40px] p-8 w-full max-w-sm modal-enter">
-                        <h2 class="text-xl font-black text-slate-800 mb-4 uppercase">Exportar</h2>
-                        <p class="text-[10px] text-slate-400 mb-4">Copie o texto abaixo para importar em outro baralho ou fazer backup.</p>
-                        <textarea readonly class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-56 focus:ring-0 outline-none font-mono text-[10px] mb-4">${exportText}</textarea>
-                        <div class="flex gap-2">
-                            <button onclick="showExportModal=false; render();" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold">Fechar</button>
-                        </div>
-                    </div>
-                </div>
-            `;
+        function deleteDeck(id) { if(confirm('Excluir este baralho permanentemente?')){ decks = decks.filter(d => d.id !== id); saveDecks(); render(); } }
+
+        function openDeck(id) {
+            currentDeckId = id; view = 'study'; isFlipped = false; showHint = false; render();
+            const deck = decks.find(d => d.id === currentDeckId);
+            const due = getDueCards(deck);
+            if (config.autoFront && due.length > 0) speak(due[0].f);
+        }
+
+        function triggerVersoAudio(cardId) {
+            const deck = decks.find(d => d.id === currentDeckId);
+            const card = deck.cards.find(c => String(c.id) === String(cardId));
+            if (!card) return;
+            const mainText = card.type === 'cloze' ? card.f : card.b;
+            speak(mainText, () => { if (card.ex) setTimeout(() => speak(card.ex), 1000); });
         }
 
         function startPreviewCard(id) { previewingCardId = id; showPreviewCardModal = true; render(); }
@@ -424,22 +430,10 @@
                         <div class="text-center">
                             <h3 class="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">Visualização</h3>
                             <div class="space-y-6">
-                                <div>
-                                    <p class="text-[8px] font-black uppercase text-slate-400 mb-1">Frente</p>
-                                    <p class="text-lg font-bold text-slate-800">${card.f}</p>
-                                </div>
-                                ${card.b ? `<div>
-                                    <p class="text-[8px] font-black uppercase text-slate-400 mb-1">Verso</p>
-                                    <p class="text-lg font-bold text-indigo-600">${card.b}</p>
-                                </div>` : ''}
-                                ${card.ex ? `<div>
-                                    <p class="text-[8px] font-black uppercase text-slate-400 mb-1">Exemplo</p>
-                                    <p class="text-sm italic text-slate-600">"${card.ex}"</p>
-                                </div>` : ''}
-                                ${card.hint ? `<div>
-                                    <p class="text-[8px] font-black uppercase text-slate-400 mb-1">Dica</p>
-                                    <p class="text-sm font-medium text-amber-600 bg-amber-50 px-3 py-2 rounded-xl inline-block">${card.hint}</p>
-                                </div>` : ''}
+                                <div><p class="text-[8px] font-black uppercase text-slate-400 mb-1">Frente</p><p class="text-lg font-bold text-slate-800">${card.f}</p></div>
+                                ${card.b ? `<div><p class="text-[8px] font-black uppercase text-slate-400 mb-1">Verso</p><p class="text-lg font-bold text-indigo-600">${card.b}</p></div>` : ''}
+                                ${card.ex ? `<div><p class="text-[8px] font-black uppercase text-slate-400 mb-1">Exemplo</p><p class="text-sm italic text-slate-600">"${card.ex}"</p></div>` : ''}
+                                ${card.hint ? `<div><p class="text-[8px] font-black uppercase text-slate-400 mb-1">Dica</p><p class="text-sm font-medium text-amber-600 bg-amber-50 px-3 py-2 rounded-xl inline-block">${card.hint}</p></div>` : ''}
                             </div>
                             <button onclick="showPreviewCardModal=false; render();" class="mt-8 w-full bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold">Fechar</button>
                         </div>
@@ -467,41 +461,18 @@
             if (decks[dIdx].cards[cIdx].type === 'cloze') decks[dIdx].cards[cIdx].hint = document.getElementById('editHint').value.trim();
             saveDecks(); 
             showEditCardModal = false; 
-            if (isEditingFromStudy) {
-                render();
-            } else {
-                showManageCardsModal = true; 
-                render();
-            }
+            if (isEditingFromStudy) render(); else { showManageCardsModal = true; render(); }
         }
 
-        /**
-         * LÓGICA DE EXCLUSÃO DENTRO DO MODAL DE EDIÇÃO
-         */
         function deleteCardAndCloseEdit() {
-            if(!confirm('Deseja excluir este card permanentemente?')) return;
-            
+            if(!confirm('Deseja excluir permanentemente?')) return;
             const deck = decks.find(d => d.id === currentDeckId);
-            if (!deck) return;
-
-            const cardIndex = deck.cards.findIndex(c => Number(c.id) === Number(editingCardId));
-            
+            const cardIndex = deck.cards.findIndex(c => String(c.id) === String(editingCardId));
             if (cardIndex > -1) {
                 deck.cards.splice(cardIndex, 1);
                 saveDecks();
                 showEditCardModal = false;
-                
-                if (isEditingFromStudy) {
-                    isFlipped = false;
-                    showHint = false;
-                    const nextDue = getDueCards(deck);
-                    if (config.autoFront && nextDue.length > 0) {
-                        setTimeout(() => speak(nextDue[0].f), 450);
-                    }
-                } else {
-                    showManageCardsModal = true;
-                }
-                
+                if (isEditingFromStudy) { isFlipped = false; showHint = false; } else showManageCardsModal = true;
                 render();
             }
         }
@@ -515,28 +486,14 @@
                     <div class="bg-white rounded-[40px] p-8 w-full max-w-sm modal-enter shadow-2xl">
                         <div class="flex justify-between items-center mb-6">
                             <h2 class="text-xl font-black text-slate-800 uppercase">Editar Card</h2>
-                            <button onclick="deleteCardAndCloseEdit()" class="bg-red-50 text-red-500 px-3 py-2 rounded-2xl active:scale-90 transition-transform flex items-center gap-1 border border-red-100">
-                                <span>🗑️</span> <span class="text-[8px] font-black uppercase">Excluir</span>
-                            </button>
+                            <button onclick="deleteCardAndCloseEdit()" class="bg-red-50 text-red-500 px-3 py-2 rounded-2xl border border-red-100">🗑️</button>
                         </div>
                         <div class="space-y-3">
                             <p class="text-[9px] font-black text-slate-400 uppercase ml-1">Frente</p>
                             <textarea id="editF" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 outline-none focus:ring-2 focus:ring-indigo-500">${card.f}</textarea>
-                            
-                            ${card.type !== 'cloze' ? `
-                                <p class="text-[9px] font-black text-slate-400 uppercase ml-1">Verso / Tradução</p>
-                                <textarea id="editB" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 outline-none focus:ring-2 focus:ring-indigo-500">${card.b || ''}</textarea>
-                            ` : ''}
-                            
-                            ${card.type === 'complete' ? `
-                                <p class="text-[9px] font-black text-slate-400 uppercase ml-1">Exemplo</p>
-                                <textarea id="editEx" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 outline-none focus:ring-2 focus:ring-indigo-500">${card.ex || ''}</textarea>
-                            ` : ''}
-                            
-                            ${card.type === 'cloze' ? `
-                                <p class="text-[9px] font-black text-slate-400 uppercase ml-1">Dica</p>
-                                <input id="editHint" value="${card.hint || ''}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500">
-                            ` : ''}
+                            ${card.type !== 'cloze' ? `<p class="text-[9px] font-black text-slate-400 uppercase ml-1">Verso</p><textarea id="editB" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 outline-none focus:ring-2 focus:ring-indigo-500">${card.b || ''}</textarea>` : ''}
+                            ${card.type === 'complete' ? `<p class="text-[9px] font-black text-slate-400 uppercase ml-1">Exemplo</p><textarea id="editEx" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 outline-none focus:ring-2 focus:ring-indigo-500">${card.ex || ''}</textarea>` : ''}
+                            ${card.type === 'cloze' ? `<p class="text-[9px] font-black text-slate-400 uppercase ml-1">Dica</p><input id="editHint" value="${card.hint || ''}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500">` : ''}
                         </div>
                         <div class="flex gap-2 mt-6">
                             <button onclick="showEditCardModal=false; ${isEditingFromStudy ? '' : 'showManageCardsModal=true;'} render();" class="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold">Voltar</button>
@@ -558,55 +515,40 @@
             const dIdx = decks.findIndex(d => d.id === currentDeckId);
             const due = getDueCards(decks[dIdx]);
             if(!due[0]) return;
-            
             const cardId = due[0].id;
             const cIdx = decks[dIdx].cards.findIndex(c => c.id === cardId);
-            let { interval, repetition, efactor, type } = decks[dIdx].cards[cIdx];
+            let { interval, repetition, efactor } = decks[dIdx].cards[cIdx];
 
             if (q >= 3) {
                 if (repetition === 0) interval = 1; 
                 else if (repetition === 1) interval = 6;
                 else interval = Math.round(interval * efactor);
-                
                 repetition++;
-                const newDate = new Date(); 
-                newDate.setDate(newDate.getDate() + interval);
-                decks[dIdx].cards[cIdx].dueDate = newDate.toISOString();
             } else if (q === 2) {
-                interval = 1;
-                repetition = 0;
-                const newDate = new Date(); 
-                newDate.setDate(newDate.getDate() + interval);
-                decks[dIdx].cards[cIdx].dueDate = newDate.toISOString();
+                interval = 1; repetition = 0;
             } else {
-                repetition = 0;
-                interval = 0;
-                const cardToMove = decks[dIdx].cards.splice(cIdx, 1)[0];
-                cardToMove.repetition = 0;
-                cardToMove.interval = 0;
-                cardToMove.dueDate = new Date().toISOString(); 
-                decks[dIdx].cards.push(cardToMove);
+                repetition = 0; interval = 0;
             }
 
             efactor = Math.max(1.3, efactor + (0.1 - (5-q)*(0.08 + (5-q)*0.02)));
+            
+            const newDate = new Date(); 
+            newDate.setDate(newDate.getDate() + interval);
             
             if (q >= 2) {
                 decks[dIdx].cards[cIdx].interval = interval;
                 decks[dIdx].cards[cIdx].repetition = repetition;
                 decks[dIdx].cards[cIdx].efactor = efactor;
+                decks[dIdx].cards[cIdx].dueDate = newDate.toISOString();
             } else {
-                decks[dIdx].cards[decks[dIdx].cards.length - 1].efactor = efactor;
+                const cardToMove = decks[dIdx].cards.splice(cIdx, 1)[0];
+                cardToMove.repetition = 0; cardToMove.interval = 0; cardToMove.dueDate = new Date().toISOString(); 
+                decks[dIdx].cards.push(cardToMove);
             }
 
-            saveDecks(); 
-            isFlipped = false; 
-            showHint = false; 
-            render();
-            
+            saveDecks(); isFlipped = false; showHint = false; render();
             const nextDue = getDueCards(decks[dIdx]);
-            if (config.autoFront && nextDue.length > 0) {
-                setTimeout(() => speak(nextDue[0].f), 450);
-            }
+            if (config.autoFront && nextDue.length > 0) setTimeout(() => speak(nextDue[0].f), 450);
         }
 
         function renderAddCardModal() {
@@ -614,29 +556,29 @@
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
                     <div class="bg-white rounded-t-[40px] sm:rounded-[40px] p-8 w-full max-w-sm overflow-y-auto max-h-[95vh] modal-enter">
                         <div class="flex justify-between items-center mb-6">
-                            <h2 class="text-xl font-black text-slate-800 uppercase">Adicionar Cards</h2>
+                            <h2 class="text-xl font-black text-slate-800 uppercase">Novo Card</h2>
                             <button onclick="showAddCardModal=false; render();" class="text-slate-300 text-3xl">&times;</button>
                         </div>
                         <div class="flex bg-slate-100 p-1 rounded-2xl mb-6 text-[10px] font-black uppercase">
                             <button onclick="addMode='single'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='single'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Individual</button>
-                            <button onclick="addMode='bulk'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Em massa</button>
+                            <button onclick="addMode='bulk'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Bulk</button>
                         </div>
                         ${addMode === 'single' ? `
                             <div class="grid grid-cols-3 gap-1 mb-6">
-                                <button onclick="cardSubtype='basic'; render();" class="text-[8px] font-black uppercase py-2 border rounded-lg ${cardSubtype==='basic'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-100 text-slate-400'}">1. Básico</button>
-                                <button onclick="cardSubtype='complete'; render();" class="text-[8px] font-black uppercase py-2 border rounded-lg ${cardSubtype==='complete'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-100 text-slate-400'}">2. Completo</button>
-                                <button onclick="cardSubtype='cloze' ; render();" class="text-[8px] font-black uppercase py-2 border rounded-lg ${cardSubtype==='cloze'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-100 text-slate-400'}">3. Lacuna</button>
+                                <button onclick="cardSubtype='basic'; render();" class="text-[8px] font-black uppercase py-2 border rounded-lg ${cardSubtype==='basic'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-100 text-slate-400'}">Card 1</button>
+                                <button onclick="cardSubtype='complete'; render();" class="text-[8px] font-black uppercase py-2 border rounded-lg ${cardSubtype==='complete'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-100 text-slate-400'}">Card 2</button>
+                                <button onclick="cardSubtype='cloze' ; render();" class="text-[8px] font-black uppercase py-2 border rounded-lg ${cardSubtype==='cloze'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-100 text-slate-400'}">Lacuna</button>
                             </div>
                             <div class="space-y-4">
-                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [lacuna]' : 'Frente (Palavra)'}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
-                                ${cardSubtype !== 'cloze' ? `<textarea id="newB" placeholder="Verso (Tradução)" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>` : ''}
+                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [lacuna]' : 'Frente do Card'}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                                ${cardSubtype !== 'cloze' ? `<textarea id="newB" placeholder="Verso" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>` : ''}
                                 ${cardSubtype === 'complete' ? `<textarea id="newEx" placeholder="Frase de Exemplo" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>` : ''}
                                 ${cardSubtype === 'cloze' ? `<input id="newHint" placeholder="Dica (Opcional)" class="w-full bg-slate-50 border-0 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none">` : ''}
-                                <button onclick="saveSingleCard()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-md">Salvar Card</button>
+                                <button onclick="saveSingleCard()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-md">Adicionar</button>
                             </div>
                         ` : `
-                            <textarea id="bulkData" placeholder="Ex: I drink [coffee] ; café&#10;Ex: cat ; gato" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-56 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-[10px]"></textarea>
-                            <button onclick="saveBulkCards()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold mt-4">Importar Todos</button>
+                            <textarea id="bulkData" placeholder="Ex: Ex: cat ; gato&#10Ex: Frente; Verso; Exemplo&#10;Ex: I drink [coffee] ; café" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-56 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-[10px]"></textarea>
+                            <button onclick="saveBulkCards()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold mt-4">Importar</button>
                         `}
                     </div>
                 </div>
@@ -645,14 +587,27 @@
 
         function saveBulkCards() {
             const data = document.getElementById('bulkData').value.trim();
+            if(!data) return;
             const lines = data.split('\n').filter(l => l.includes(';'));
             const idx = decks.findIndex(d => d.id === currentDeckId);
             lines.forEach((line, i) => {
-                const p = line.split(';').map(s => s.trim());
-                if (p[0]) {
-                    let type = 'basic', f = p[0], b = p[1] || '', ex = p[2] || '', hint = p[3] || '';
-                    if (f.includes('[') && f.includes(']')) { type = 'cloze'; hint = b; b = ''; } else if (ex) { type = 'complete'; }
-                    decks[idx].cards.push({ id: Date.now() + i, type, f, b, ex, hint, interval: 0, repetition: 0, efactor: 2.5, dueDate: new Date().toISOString() });
+                const parts = line.split(';').map(s => s.trim());
+                if (parts[0]) {
+                    let f = parts[0], b = parts[1] || '', ex = parts[2] || '', hint = parts[3] || '';
+                    let type = 'basic';
+                    if (f.includes('[') && f.includes(']')) {
+                        type = 'cloze';
+                        if (b && !hint) hint = b;
+                        b = '';
+                    } else if (ex) {
+                        type = 'complete';
+                    }
+                    decks[idx].cards.push({ 
+                        id: Date.now() + i + Math.random(), 
+                        type, f, b, ex, hint, 
+                        interval: 0, repetition: 0, efactor: 2.5, 
+                        dueDate: new Date().toISOString() 
+                    });
                 }
             });
             saveDecks(); showAddCardModal = false; render();
@@ -671,6 +626,12 @@
             const idx = decks.findIndex(d => d.id === currentDeckId);
             decks[idx].cards.push(cardData);
             saveDecks(); showAddCardModal = false; render();
+        }
+
+        function renderExportModal() {
+            const deck = decks.find(d => d.id === currentDeckId);
+            const exportText = deck.cards.map(c => `${c.f} ; ${c.b} ; ${c.ex} ; ${c.hint}`).join('\n');
+            return `<div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-6"><div class="bg-white rounded-[40px] p-8 w-full max-w-sm modal-enter"><h2 class="text-xl font-black text-slate-800 mb-4 uppercase">Exportar</h2><textarea readonly class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-56 font-mono text-[10px] mb-4">${exportText}</textarea><button onclick="showExportModal=false; render();" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold">Fechar</button></div></div>`;
         }
 
         render();
