@@ -18,7 +18,7 @@
         
         body { 
             -webkit-tap-highlight-color: transparent; 
-            padding-top: calc(var(--sat) + 40px);
+            padding-top: calc(var(--sat) + 50px);
             padding-bottom: calc(var(--sab) + 0px);
             background-color: #f8fafc;
             min-height: 100vh;
@@ -570,14 +570,14 @@
                                 <button onclick="cardSubtype='cloze' ; render();" class="text-[8px] font-black uppercase py-2 border rounded-lg ${cardSubtype==='cloze'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-100 text-slate-400'}">Lacuna</button>
                             </div>
                             <div class="space-y-4">
-                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [lacuna]' : 'Frente do Card'}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [lacuna]' : 'Frente'}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
                                 ${cardSubtype !== 'cloze' ? `<textarea id="newB" placeholder="Verso" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>` : ''}
-                                ${cardSubtype === 'complete' ? `<textarea id="newEx" placeholder="Frase de Exemplo" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>` : ''}
+                                ${cardSubtype === 'complete' ? `<textarea id="newEx" placeholder="Exemplo" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>` : ''}
                                 ${cardSubtype === 'cloze' ? `<input id="newHint" placeholder="Dica (Opcional)" class="w-full bg-slate-50 border-0 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none">` : ''}
                                 <button onclick="saveSingleCard()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-md">Adicionar</button>
                             </div>
                         ` : `
-                            <textarea id="bulkData" placeholder="Ex: Ex: cat ; gato&#10Ex: Frente; Verso; Exemplo&#10;Ex: I drink [coffee] ; café" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-56 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-[10px]"></textarea>
+                            <textarea id="bulkData" placeholder="Ex: cat; gato&#10Ex: Frente; Verso; Exemplo&#10;Ex: I drink [coffee]; café" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-56 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-[10px]"></textarea>
                             <button onclick="saveBulkCards()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold mt-4">Importar</button>
                         `}
                     </div>
