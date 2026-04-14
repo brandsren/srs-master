@@ -124,7 +124,7 @@
                             <div class="flex-1 truncate pr-4">
                                 <h2 class="text-xl font-bold text-slate-800 truncate">${deck.name}</h2>
                                 <p class="text-[11px] font-medium ${dueCount > 0 ? 'text-indigo-500' : 'text-slate-400'}">
-                                    ${dueCount} a revisar • <span class="text-slate-400">${totalCount} cards total</span>
+                                    ${dueCount} revisões • <span class="text-slate-400">${totalCount} cards total</span>
                                 </p>
                             </div>
                             <div class="flex gap-2">
@@ -440,6 +440,47 @@
             }
         }
 
+        /**
+         * FUNÇÃO DE EXCLUSÃO CORRIGIDA
+         */
+        function deleteCardAndCloseEdit() {
+            if(!confirm('Deseja excluir este card permanentemente?')) return;
+            
+            const deck = decks.find(d => d.id === currentDeckId);
+            if (!deck) return;
+
+            // Encontra o índice exato usando Number() para evitar erros de tipo
+            const cardIndex = deck.cards.findIndex(c => Number(c.id) === Number(editingCardId));
+            
+            if (cardIndex > -1) {
+                // Remove o item usando splice para garantir alteração no array original
+                deck.cards.splice(cardIndex, 1);
+                
+                // Salva no localStorage
+                saveDecks();
+                
+                // Fecha o modal
+                showEditCardModal = false;
+                
+                // Limpa estados de estudo
+                if (isEditingFromStudy) {
+                    isFlipped = false;
+                    showHint = false;
+                    // Se o próximo card existir e o áudio estiver ligado, toca
+                    const nextDue = getDueCards(deck);
+                    if (config.autoFront && nextDue.length > 0) {
+                        setTimeout(() => speak(nextDue[0].f), 450);
+                    }
+                } else {
+                    showManageCardsModal = true;
+                }
+                
+                render();
+            } else {
+                console.error("Card não encontrado para exclusão:", editingCardId);
+            }
+        }
+
         function renderEditCardModal() {
             const deck = decks.find(d => d.id === currentDeckId);
             const card = deck.cards.find(c => String(c.id) === String(editingCardId));
@@ -447,7 +488,12 @@
             return `
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] flex items-center justify-center p-6">
                     <div class="bg-white rounded-[40px] p-8 w-full max-w-sm modal-enter shadow-2xl">
-                        <h2 class="text-xl font-black text-slate-800 mb-6 uppercase">Editar Card</h2>
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-xl font-black text-slate-800 uppercase">Editar Card</h2>
+                            <button onclick="deleteCardAndCloseEdit()" class="bg-red-50 text-red-500 px-3 py-2 rounded-2xl active:scale-90 transition-transform flex items-center gap-1 border border-red-100">
+                                <span>🗑️</span> <span class="text-[8px] font-black uppercase">Excluir</span>
+                            </button>
+                        </div>
                         <div class="space-y-3">
                             <p class="text-[9px] font-black text-slate-400 uppercase ml-1">Frente</p>
                             <textarea id="editF" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 outline-none focus:ring-2 focus:ring-indigo-500">${card.f}</textarea>
@@ -548,7 +594,7 @@
                         </div>
                         <div class="flex bg-slate-100 p-1 rounded-2xl mb-6 text-[10px] font-black uppercase">
                             <button onclick="addMode='single'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='single'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Individual</button>
-                            <button onclick="addMode='bulk'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Em massa</button>
+                            <button onclick="addMode='bulk'; render();" class="flex-1 py-3 rounded-xl transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Massa (;)</button>
                         </div>
                         ${addMode === 'single' ? `
                             <div class="grid grid-cols-3 gap-1 mb-6">
