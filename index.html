@@ -52,7 +52,7 @@
     <script>
         // --- Estado Global ---
         let decks = JSON.parse(localStorage.getItem('srs_v21_decks') || '[]');
-        let config = JSON.parse(localStorage.getItem('srs_config_v21') || '{"autoFront": true, "autoBack": true, "shuffle": false, "prioritizeNew": false}');
+        let config = JSON.parse(localStorage.getItem('srs_config_v21') || '{"shuffle": false, "prioritizeNew": false}');
         
         let view = 'home'; 
         let currentDeckId = null;
@@ -100,8 +100,10 @@
 
         const isNewCard = (card) => !card.wasViewed;
 
+        const getCurrentDeck = () => decks.find(d => String(d.id) === String(currentDeckId));
+
         const refreshStudyQueue = () => {
-            const deck = decks.find(d => String(d.id) === String(currentDeckId));
+            const deck = getCurrentDeck();
             if (!deck || !deck.cards) {
                 studyQueue = [];
                 return;
@@ -130,10 +132,18 @@
             window.speechSynthesis.speak(utterance);
         }
 
-        function toggleConfig(key) {
-            config[key] = !config[key];
-            saveConfig();
-            refreshStudyQueue(); 
+        // Função alterada para salvar no Deck atual
+        function toggleAudioSetting(key) {
+            const deck = getCurrentDeck();
+            if (!deck) return;
+            
+            // Inicializa se não existir
+            if (deck[key] === undefined) {
+                deck[key] = true; // Padrão inicial
+            }
+            
+            deck[key] = !deck[key];
+            saveDecks();
             render();
         }
 
@@ -255,6 +265,10 @@
 
         function renderStudy(root) {
             const card = studyQueue[0];
+            const deck = getCurrentDeck();
+            const autoFront = deck.autoFront !== undefined ? deck.autoFront : true;
+            const autoBack = deck.autoBack !== undefined ? deck.autoBack : true;
+
             root.innerHTML = `
                 <div class="flex justify-between items-center mb-6">
                     <button onclick="view='home'; render();" class="text-slate-400 font-bold text-xs uppercase tracking-widest">← Início</button>
@@ -267,10 +281,10 @@
 
                 ${studyQueue.length > 0 ? `
                     <div class="flex justify-center gap-4 mb-4">
-                        <button onclick="toggleConfig('autoFront')" class="text-[9px] font-black uppercase px-3 py-1.5 rounded-full border transition-all ${config.autoFront ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-400'}">
+                        <button onclick="toggleAudioSetting('autoFront')" class="text-[9px] font-black uppercase px-3 py-1.5 rounded-full border transition-all ${autoFront ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-400'}">
                             🔊 Auto Frente
                         </button>
-                        <button onclick="toggleConfig('autoBack')" class="text-[9px] font-black uppercase px-3 py-1.5 rounded-full border transition-all ${config.autoBack ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-400'}">
+                        <button onclick="toggleAudioSetting('autoBack')" class="text-[9px] font-black uppercase px-3 py-1.5 rounded-full border transition-all ${autoBack ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-400'}">
                             🔊 Auto Verso
                         </button>
                     </div>
@@ -332,7 +346,9 @@
             if (studyQueue.length === 0) return;
             isFlipped = !isFlipped;
             render();
-            if (isFlipped && config.autoBack) {
+            const deck = getCurrentDeck();
+            const autoBack = deck.autoBack !== undefined ? deck.autoBack : true;
+            if (isFlipped && autoBack) {
                 triggerVersoAudio(studyQueue[0].id);
             }
         }
@@ -344,7 +360,10 @@
             showHint = false; 
             refreshStudyQueue(); 
             render();
-            if (config.autoFront && studyQueue.length > 0) speak(studyQueue[0].f);
+            
+            const deck = getCurrentDeck();
+            const autoFront = deck.autoFront !== undefined ? deck.autoFront : true;
+            if (autoFront && studyQueue.length > 0) speak(studyQueue[0].f);
         }
 
         function triggerVersoAudio(cardId) {
@@ -387,14 +406,27 @@
             studyQueue.shift();
             render();
             
-            if (studyQueue.length > 0 && config.autoFront) {
+            const deck = getCurrentDeck();
+            const autoFront = deck.autoFront !== undefined ? deck.autoFront : true;
+            if (studyQueue.length > 0 && autoFront) {
                 setTimeout(() => speak(studyQueue[0].f), 450);
             }
         }
 
         function createNewDeck() {
             const name = document.getElementById('deckNameInput').value.trim();
-            if (name) { decks.push({ id: Date.now(), name, cards: [] }); saveDecks(); showAddDeckModal = false; render(); }
+            if (name) { 
+                decks.push({ 
+                    id: Date.now(), 
+                    name, 
+                    cards: [],
+                    autoFront: true, // Configuração padrão por baralho
+                    autoBack: true    // Configuração padrão por baralho
+                }); 
+                saveDecks(); 
+                showAddDeckModal = false; 
+                render(); 
+            }
         }
 
         function deleteDeck(id) { if(confirm('Excluir este baralho permanentemente?')){ decks = decks.filter(d => String(d.id) !== String(id)); saveDecks(); render(); } }
@@ -650,4 +682,4 @@
         render();
     </script>
 </body>
-</html
+</html>
