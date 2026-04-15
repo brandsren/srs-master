@@ -132,16 +132,10 @@
             window.speechSynthesis.speak(utterance);
         }
 
-        // Função alterada para salvar no Deck atual
         function toggleAudioSetting(key) {
             const deck = getCurrentDeck();
             if (!deck) return;
-            
-            // Inicializa se não existir
-            if (deck[key] === undefined) {
-                deck[key] = true; // Padrão inicial
-            }
-            
+            if (deck[key] === undefined) deck[key] = true;
             deck[key] = !deck[key];
             saveDecks();
             render();
@@ -416,16 +410,8 @@
         function createNewDeck() {
             const name = document.getElementById('deckNameInput').value.trim();
             if (name) { 
-                decks.push({ 
-                    id: Date.now(), 
-                    name, 
-                    cards: [],
-                    autoFront: true, // Configuração padrão por baralho
-                    autoBack: true    // Configuração padrão por baralho
-                }); 
-                saveDecks(); 
-                showAddDeckModal = false; 
-                render(); 
+                decks.push({ id: Date.now(), name, cards: [], autoFront: true, autoBack: true }); 
+                saveDecks(); showAddDeckModal = false; render(); 
             }
         }
 
@@ -519,28 +505,24 @@
                                 <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Frente / Frase</p>
                                 <textarea id="editF" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 focus:ring-2 focus:ring-indigo-500 outline-none">${card.f}</textarea>
                             </div>
-                            
                             ${card.type !== 'cloze' ? `
                                 <div>
                                     <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Verso (Tradução)</p>
                                     <textarea id="editB" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none">${card.b || ''}</textarea>
                                 </div>
                             ` : ''}
-
                             ${card.type === 'complete' ? `
                                 <div>
                                     <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Frase Exemplo</p>
                                     <textarea id="editEx" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none">${card.ex || ''}</textarea>
                                 </div>
                             ` : ''}
-
                             ${card.type === 'cloze' ? `
                                 <div>
                                     <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Dica (Significado)</p>
                                     <input id="editHint" value="${card.hint || ''}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 focus:ring-2 focus:ring-indigo-500 outline-none">
                                 </div>
                             ` : ''}
-
                             <div class="grid grid-cols-2 gap-2 mt-6">
                                 <button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; render();" class="bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold">Cancelar</button>
                                 <button onclick="saveEditedCard()" class="bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-md">Salvar</button>
@@ -554,13 +536,29 @@
         function saveEditedCard() {
             const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             const cIdx = decks[dIdx].cards.findIndex(c => String(c.id) === String(editingCardId));
-            decks[dIdx].cards[cIdx].f = document.getElementById('editF').value.trim();
-            if (decks[dIdx].cards[cIdx].type !== 'cloze') decks[dIdx].cards[cIdx].b = document.getElementById('editB').value.trim();
-            if (decks[dIdx].cards[cIdx].type === 'complete') decks[dIdx].cards[cIdx].ex = document.getElementById('editEx').value.trim();
-            if (decks[dIdx].cards[cIdx].type === 'cloze') decks[dIdx].cards[cIdx].hint = document.getElementById('editHint').value.trim();
+            
+            // Novos valores
+            const newF = document.getElementById('editF').value.trim();
+            const card = decks[dIdx].cards[cIdx];
+            card.f = newF;
+            if (card.type !== 'cloze') card.b = document.getElementById('editB').value.trim();
+            if (card.type === 'complete') card.ex = document.getElementById('editEx').value.trim();
+            if (card.type === 'cloze') card.hint = document.getElementById('editHint').value.trim();
+            
             saveDecks(); 
             showEditCardModal = false; 
-            if (isEditingFromStudy) { refreshStudyQueue(); render(); } else { showManageCardsModal = true; render(); }
+
+            if (isEditingFromStudy) {
+                // Se estiver estudando, atualizamos o card diretamente na fila de estudo atual
+                const qIdx = studyQueue.findIndex(c => String(c.id) === String(editingCardId));
+                if (qIdx !== -1) {
+                    studyQueue[qIdx] = {...card};
+                }
+                render(); 
+            } else { 
+                showManageCardsModal = true; 
+                render(); 
+            }
         }
 
         function deleteCard(id, fromEditor = false) {
@@ -570,8 +568,14 @@
             saveDecks(); 
             if (fromEditor) {
                 showEditCardModal = false;
-                if (isEditingFromStudy) refreshStudyQueue(); else showManageCardsModal = true;
-            } else if (view === 'study') refreshStudyQueue();
+                if (isEditingFromStudy) {
+                    studyQueue = studyQueue.filter(c => String(c.id) !== String(id));
+                } else {
+                    showManageCardsModal = true;
+                }
+            } else if (view === 'study') {
+                studyQueue = studyQueue.filter(c => String(c.id) !== String(id));
+            }
             render();
         }
 
