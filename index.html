@@ -19,7 +19,7 @@
         body { 
             -webkit-tap-highlight-color: transparent; 
             padding-top: calc(var(--sat) + 60px);
-            padding-bottom: calc(var(--sab) + 0px);
+            padding-bottom: calc(var(--sab) + 5px);
             background-color: #f8fafc;
             min-height: 100vh;
             margin: 0;
@@ -109,14 +109,24 @@
             }
             
             const now = new Date();
+            // Cards vencidos ou novos
             let allDue = deck.cards.filter(c => isNewCard(c) || new Date(c.dueDate) <= now);
             
+            // Priorizar os cards que estão com intervalo 0 (erros recentes)
+            const errorCards = allDue.filter(c => !isNewCard(c) && c.interval === 0);
             const newCards = allDue.filter(c => isNewCard(c));
-            const reviewCards = allDue.filter(c => !isNewCard(c));
+            const reviewCards = allDue.filter(c => !isNewCard(c) && c.interval > 0);
 
-            let result = config.prioritizeNew ? [...newCards, ...reviewCards] : [...reviewCards, ...newCards];
+            let result;
+            if (config.prioritizeNew) {
+                result = [...errorCards, ...newCards, ...reviewCards];
+            } else {
+                result = [...errorCards, ...reviewCards, ...newCards];
+            }
             
             if (config.shuffle) {
+                // Shuffle apenas o que não for erro crítico se quiser manter erros no topo
+                // Aqui vamos embaralhar tudo para simplificar, mas a lógica de erro unshift no 'rate' resolve no meio da sessão
                 for (let i = result.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [result[i], result[j]] = [result[j], result[i]];
@@ -174,16 +184,20 @@
                         return `
                         <div onclick="openDeck(${deck.id})" class="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex justify-between items-center active:scale-95 transition-all cursor-pointer">
                             <div class="flex-1 truncate pr-4">
-                                <h2 class="text-xl font-bold text-slate-800 truncate mb-2">${deck.name}</h2>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <h2 class="text-xl font-bold text-slate-800 truncate">${deck.name}</h2>
+                                    <button onclick="event.stopPropagation(); startRenameDeck(${deck.id})" class="text-slate-300 hover:text-indigo-500 p-1 text-sm">✏️</button>
+                                </div>
                                 <div class="flex flex-wrap gap-2">
                                     <span class="bg-indigo-50 text-indigo-600 text-[8px] font-black px-2 py-1 rounded-lg uppercase">Novos: ${novos}</span>
                                     <span class="bg-emerald-50 text-emerald-600 text-[8px] font-black px-2 py-1 rounded-lg uppercase">Revisar: ${revisar}</span>
                                     <span class="bg-slate-100 text-slate-400 text-[8px] font-black px-2 py-1 rounded-lg uppercase">Total: ${total}</span>
                                 </div>
                             </div>
-                            <div class="flex gap-1">
-                                <button onclick="event.stopPropagation(); startRenameDeck(${deck.id})" class="text-slate-300 hover:text-indigo-500 p-2 text-lg">✏️</button>
-                                <button onclick="event.stopPropagation(); if(confirm('Excluir baralho?')) deleteDeck(${deck.id})" class="text-slate-300 hover:text-red-500 p-2 text-xl">&times;</button>
+                            <div class="text-slate-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
                             </div>
                         </div>
                         `;
@@ -215,11 +229,19 @@
             return `
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
                     <div class="bg-white rounded-[40px] p-8 w-full max-w-sm modal-enter">
-                        <h2 class="text-xl font-black text-slate-800 mb-6 uppercase text-center">Renomear</h2>
-                        <input id="renameDeckInput" value="${deck.name}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 mb-4 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-xl font-black text-slate-800 uppercase text-center">Editar Baralho</h2>
+                            <button onclick="if(confirm('Excluir baralho e todos os seus cards?')) deleteDeck(${renamingDeckId})" class="text-rose-500 p-2 active:scale-90 transition-transform">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="text-[10px] font-black text-slate-400 uppercase mb-2">Nome do Baralho</p>
+                        <input id="renameDeckInput" value="${deck.name}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 mb-6 focus:ring-2 focus:ring-indigo-500 outline-none">
                         <div class="flex gap-2">
                             <button onclick="showRenameDeckModal=false; render();" class="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold">Voltar</button>
-                            <button onclick="saveNewDeckName()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold">Salvar</button>
+                            <button onclick="saveNewDeckName()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-md">Salvar</button>
                         </div>
                     </div>
                 </div>`;
@@ -394,11 +416,12 @@
                 studyQueue.shift();
             } else {
                 card.repetition = 0; 
-                card.interval = 0; 
+                card.interval = 0; // Marca intervalo como 0 para ser priorizado no refresh
                 if (q === 1) card.lapses = (card.lapses || 0) + 1;
                 card.efactor = Math.max(1.3, card.efactor - 0.2);
                 card.dueDate = new Date().toISOString();
 
+                // Move para o final imediato da sessão atual
                 const failedCard = studyQueue.shift();
                 studyQueue.push(failedCard);
             }
@@ -423,7 +446,12 @@
             }
         }
 
-        function deleteDeck(id) { if(confirm('Excluir este baralho permanentemente?')){ decks = decks.filter(d => String(d.id) !== String(id)); saveDecks(); render(); } }
+        function deleteDeck(id) { 
+            decks = decks.filter(d => String(d.id) !== String(id)); 
+            saveDecks(); 
+            showRenameDeckModal = false;
+            render(); 
+        }
 
         function renderManageCardsModal() {
             const deck = decks.find(d => String(d.id) === String(currentDeckId));
