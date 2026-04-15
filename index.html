@@ -19,7 +19,7 @@
         body { 
             -webkit-tap-highlight-color: transparent; 
             padding-top: calc(var(--sat) + 60px);
-            padding-bottom: calc(var(--sab) + 5px);
+            padding-bottom: calc(var(--sab) + 0px);
             background-color: #f8fafc;
             min-height: 100vh;
             margin: 0;
@@ -65,13 +65,11 @@
         let showAddCardModal = false;
         let showEditCardModal = false;
         let showManageCardsModal = false;
-        let showPreviewCardModal = false;
         let showExportModal = false;
         let showStudyConfigModal = false;
         
         let editingCardId = null;
         let isEditingFromStudy = false;
-        let previewingCardId = null;
         let renamingDeckId = null;
         let addMode = 'single'; 
         let cardSubtype = 'cloze'; 
@@ -336,7 +334,6 @@
                 ${showAddCardModal ? renderAddCardModal() : ''}
                 ${showManageCardsModal ? renderManageCardsModal() : ''}
                 ${showEditCardModal ? renderEditCardModal() : ''}
-                ${showPreviewCardModal ? renderPreviewCardModal() : ''}
                 ${showExportModal ? renderExportModal() : ''}
                 ${showStudyConfigModal ? renderStudyConfigModal() : ''}
             `;
@@ -484,7 +481,7 @@
                 const isNew = isNewCard(c);
                 const errorCount = c.lapses || 0;
                 return `
-                <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
+                <div onclick="startEditCard('${c.id}', false)" class="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center active:bg-slate-100 transition-colors cursor-pointer">
                     <div class="truncate pr-4 flex-1">
                         <div class="flex items-center gap-2 mb-1">
                             <span class="text-[7px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">${typeLabel}</span>
@@ -496,10 +493,7 @@
                         </div>
                         <div class="font-bold text-slate-800 truncate text-sm">${c.f}</div>
                     </div>
-                    <div class="flex gap-3 flex-shrink-0 items-center">
-                        <button onclick="startPreviewCard('${c.id}')" class="text-slate-400 text-sm p-1">👁️</button>
-                        <button onclick="startEditCard('${c.id}', false)" class="text-slate-400 text-sm p-1">✏️</button>
-                    </div>
+                    <div class="text-slate-300 ml-2">›</div>
                 </div>
             `}).join('');
         }
@@ -510,6 +504,15 @@
             showEditCardModal = true; 
             showManageCardsModal = false; 
             render(); 
+        }
+
+        function clearCardErrors() {
+            if(!confirm('Deseja zerar o contador de erros deste card? O agendamento continuará o mesmo.')) return;
+            const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
+            const cIdx = decks[dIdx].cards.findIndex(c => String(c.id) === String(editingCardId));
+            decks[dIdx].cards[cIdx].lapses = 0;
+            saveDecks();
+            render();
         }
 
         function renderEditCardModal() {
@@ -533,6 +536,20 @@
                         </div>
                         
                         <div class="space-y-4">
+                            <div class="flex justify-between items-end">
+                                <div>
+                                    <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Status de Performance</p>
+                                    <div class="text-[10px] font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full inline-block">
+                                        Erros acumulados: <span class="${(card.lapses || 0) > 0 ? 'text-rose-500' : ''}">${card.lapses || 0}</span>
+                                    </div>
+                                </div>
+                                ${(card.lapses || 0) > 0 ? `
+                                    <button onclick="clearCardErrors()" class="text-[9px] font-black text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl uppercase active:scale-95 transition-transform">
+                                        Limpar Erros
+                                    </button>
+                                ` : ''}
+                            </div>
+
                             <div>
                                 <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Frente / Frase</p>
                                 <textarea id="editF" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 focus:ring-2 focus:ring-indigo-500 outline-none">${card.f}</textarea>
@@ -607,26 +624,6 @@
                 studyQueue = studyQueue.filter(c => String(c.id) !== String(id));
             }
             render();
-        }
-
-        function startPreviewCard(id) { previewingCardId = id; showPreviewCardModal = true; showManageCardsModal = false; render(); }
-
-        function renderPreviewCardModal() {
-            const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
-            const card = decks[dIdx].cards.find(c => String(c.id) === String(previewingCardId));
-            return `
-                <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-6">
-                    <div class="bg-white rounded-[40px] p-8 w-full max-w-sm modal-enter text-center">
-                        <h2 class="text-xl font-black mb-6 uppercase">Visualizar</h2>
-                        <div class="space-y-4 mb-8 text-left">
-                            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100"><p class="text-[8px] font-black text-slate-400 uppercase mb-1">Frente</p><p class="text-sm font-bold">${card.f}</p></div>
-                            <div class="bg-indigo-50 p-4 rounded-2xl border border-indigo-100"><p class="text-[8px] font-black text-indigo-400 uppercase mb-1">Resposta</p><p class="text-sm font-bold text-indigo-700">${card.type === 'cloze' ? card.hint : card.b}</p></div>
-                            <div class="bg-rose-50 p-4 rounded-2xl border border-rose-100"><p class="text-[8px] font-black text-rose-400 uppercase mb-1">Total de Erros (Lapses)</p><p class="text-sm font-bold text-rose-700">${card.lapses || 0}</p></div>
-                        </div>
-                        <button onclick="showPreviewCardModal=false; showManageCardsModal=true; render();" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold">Fechar</button>
-                    </div>
-                </div>
-            `;
         }
 
         function copyExportText() {
