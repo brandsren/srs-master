@@ -44,6 +44,15 @@
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+
+        @keyframes pulse-red {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .urgent-alert {
+            animation: pulse-red 2s infinite;
+        }
     </style>
 </head>
 <body class="text-slate-900 font-sans">
@@ -109,30 +118,31 @@
             }
             
             const now = new Date();
-            // Cards vencidos ou novos
             let allDue = deck.cards.filter(c => isNewCard(c) || new Date(c.dueDate) <= now);
             
-            // Priorizar os cards que estão com intervalo 0 (erros recentes)
             const errorCards = allDue.filter(c => !isNewCard(c) && c.interval === 0);
             const newCards = allDue.filter(c => isNewCard(c));
             const reviewCards = allDue.filter(c => !isNewCard(c) && c.interval > 0);
 
-            let result;
-            if (config.prioritizeNew) {
-                result = [...errorCards, ...newCards, ...reviewCards];
-            } else {
-                result = [...errorCards, ...reviewCards, ...newCards];
-            }
-            
-            if (config.shuffle) {
-                // Shuffle apenas o que não for erro crítico se quiser manter erros no topo
-                // Aqui vamos embaralhar tudo para simplificar, mas a lógica de erro unshift no 'rate' resolve no meio da sessão
-                for (let i = result.length - 1; i > 0; i--) {
+            const shuffleArray = (arr) => {
+                if (!config.shuffle) return arr;
+                let a = [...arr];
+                for (let i = a.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
-                    [result[i], result[j]] = [result[j], result[i]];
+                    [a[i], a[j]] = [a[j], a[i]];
                 }
+                return a;
+            };
+
+            const sErrors = shuffleArray(errorCards);
+            const sNew = shuffleArray(newCards);
+            const sReview = shuffleArray(reviewCards);
+
+            if (config.prioritizeNew) {
+                studyQueue = [...sErrors, ...sNew, ...sReview];
+            } else {
+                studyQueue = [...sErrors, ...sReview, ...sNew];
             }
-            studyQueue = result;
         };
 
         function speak(text, callback) {
@@ -182,7 +192,7 @@
                         const total = deck.cards.length;
                         
                         return `
-                        <div onclick="openDeck(${deck.id})" class="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex justify-between items-center active:scale-95 transition-all cursor-pointer">
+                        <div onclick="openDeck(${deck.id})" class="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex justify-between items-center active:scale-95 transition-all cursor-pointer relative overflow-hidden">
                             <div class="flex-1 truncate pr-4">
                                 <div class="flex items-center gap-2 mb-2">
                                     <h2 class="text-xl font-bold text-slate-800 truncate">${deck.name}</h2>
@@ -194,10 +204,17 @@
                                     <span class="bg-slate-100 text-slate-400 text-[8px] font-black px-2 py-1 rounded-lg uppercase">Total: ${total}</span>
                                 </div>
                             </div>
-                            <div class="text-slate-300">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                                </svg>
+                            <div class="flex items-center gap-3">
+                                ${revisar > 0 ? `
+                                    <div class="urgent-alert bg-rose-500 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-md">
+                                        <span class="text-[14px] font-black">!</span>
+                                    </div>
+                                ` : ''}
+                                <div class="text-slate-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </div>
                             </div>
                         </div>
                         `;
@@ -316,7 +333,7 @@
                                     <button onclick="event.stopPropagation(); startEditCard('${card.id}', true)" class="text-slate-300 text-lg p-2 active:scale-90 transition-transform">✏️</button>
                                 </div>
                                 <span class="absolute top-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                                    ${isNewCard(card) ? 'Card Novo' : 'Revisão'}
+                                    ${isNewCard(card) ? 'Card Novo' : (card.interval === 0 ? 'Errou Agora' : 'Revisão')}
                                 </span>
                                 <div class="text-2xl font-bold text-slate-800 leading-tight">
                                     ${card.type === 'cloze' ? card.f.replace(/\[(.*?)\]/g, '<span class="cloze-placeholder">...</span>') : card.f}
@@ -416,12 +433,14 @@
                 studyQueue.shift();
             } else {
                 card.repetition = 0; 
-                card.interval = 0; // Marca intervalo como 0 para ser priorizado no refresh
+                card.interval = 0;
                 if (q === 1) card.lapses = (card.lapses || 0) + 1;
                 card.efactor = Math.max(1.3, card.efactor - 0.2);
-                card.dueDate = new Date().toISOString();
+                
+                const pastDate = new Date();
+                pastDate.setMinutes(pastDate.getMinutes() - 1);
+                card.dueDate = pastDate.toISOString();
 
-                // Move para o final imediato da sessão atual
                 const failedCard = studyQueue.shift();
                 studyQueue.push(failedCard);
             }
