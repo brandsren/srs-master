@@ -1,6 +1,4 @@
 
-
-
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -100,6 +98,9 @@
         let searchTerm = '';
         let showOnlyErrors = false;
 
+        // Estado temporário para persistir dados entre Prévia e Edição/Criação
+        let tempDraft = { f: '', b: '', ex: '', hint: '' };
+
         let previewFlipped = false;
         let previewShowHint = false;
         window.tempPreviewCard = null;
@@ -145,7 +146,7 @@
                 let a = [...arr];
                 for (let i = a.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
-                    [a[j], a[i]] = [a[i], a[j]];
+                    [a[j], a[i]] = [a[j], a[i]]
                 }
                 return a;
             };
@@ -349,7 +350,7 @@
                     <div class="flex gap-2">
                         <button onclick="showStudyConfigModal=true; render();" class="bg-white text-slate-600 p-2 rounded-xl border border-slate-100 shadow-sm active:scale-95 transition-all"><i data-lucide="sliders-horizontal" class="w-5 h-5"></i></button>
                         <button onclick="showManageCardsModal=true; searchTerm=''; showOnlyErrors=false; render();" class="bg-white text-slate-600 p-2 rounded-xl border border-slate-100 shadow-sm active:scale-95 transition-all"><i data-lucide="list" class="w-5 h-5"></i></button>
-                        <button onclick="showAddCardModal=true; cardAddedFeedback=false; render();" class="bg-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-100 active:scale-95 transition-all"><i data-lucide="plus" class="w-5 h-5"></i></button>
+                        <button onclick="showAddCardModal=true; cardAddedFeedback=false; clearTempDraft(); render();" class="bg-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-100 active:scale-95 transition-all"><i data-lucide="plus" class="w-5 h-5"></i></button>
                     </div>
                 </div>
 
@@ -543,6 +544,7 @@
 
         function startEditCard(id, fromStudy = false) { 
             editingCardId = id; isEditingFromStudy = fromStudy;
+            clearTempDraft(); // Limpar rascunho antes de editar um card existente
             showEditCardModal = true; showManageCardsModal = false; render(); 
         }
 
@@ -550,6 +552,13 @@
             const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             const card = decks[dIdx].cards.find(c => String(c.id) === String(editingCardId));
             if (!card) return '';
+
+            // Se o rascunho estiver vazio (primeira abertura), carregar do card
+            const fValue = tempDraft.f || card.f;
+            const bValue = card.type !== 'cloze' ? (tempDraft.b || card.b) : '';
+            const exValue = card.type === 'complete' ? (tempDraft.ex || card.ex) : '';
+            const hintValue = card.type === 'cloze' ? (tempDraft.hint || card.hint) : '';
+
             return `
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-6">
                     <div class="bg-white rounded-t-[40px] sm:rounded-[40px] p-8 w-full max-sm overflow-y-auto max-h-[95vh] modal-enter relative shadow-2xl">
@@ -562,7 +571,7 @@
                                 <button onclick="deleteCard('${card.id}', true)" class="bg-rose-50 text-rose-500 p-3 rounded-2xl active:scale-90 transition-transform">
                                     <i data-lucide="trash-2" class="w-5 h-5"></i>
                                 </button>
-                                <button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; render();" class="bg-slate-50 p-2 rounded-xl text-slate-300">
+                                <button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; clearTempDraft(); render();" class="bg-slate-50 p-2 rounded-xl text-slate-300">
                                     <i data-lucide="x" class="w-6 h-6"></i>
                                 </button>
                             </div>
@@ -582,15 +591,19 @@
                                 <div><p class="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Performance</p><div class="text-[11px] font-bold text-slate-700">Erros acumulados: <span class="${(card.lapses || 0) > 0 ? 'text-rose-500' : 'text-emerald-500'}">${card.lapses || 0}</span></div></div>
                                 ${(card.lapses || 0) > 0 ? `<button onclick="const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId)); const cIdx = decks[dIdx].cards.findIndex(c => String(c.id) === String(editingCardId)); decks[dIdx].cards[cIdx].lapses = 0; saveDecks(); render();" class="text-[9px] font-black text-indigo-600 bg-white border border-indigo-100 px-4 py-2.5 rounded-2xl uppercase active:scale-95 transition-all shadow-sm">Zerar Erros</button>` : ''}
                             </div>
-                            <div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Frente / Frase</p><textarea id="editF" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-28 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${card.f}</textarea></div>
-                            ${card.type !== 'cloze' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Verso</p><textarea id="editB" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${card.b || ''}</textarea></div>` : ''}
-                            ${card.type === 'complete' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Exemplo</p><textarea id="editEx" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed italic">${card.ex || ''}</textarea></div>` : ''}
-                            ${card.type === 'cloze' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Dica</p><input id="editHint" value="${card.hint || ''}" class="w-full bg-slate-50 border-0 rounded-3xl p-5 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"></div>` : ''}
-                            <div class="grid grid-cols-2 gap-3 pt-4"><button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; render();" class="bg-slate-100 text-slate-500 py-4 rounded-3xl font-bold active:scale-95 transition-transform">Cancelar</button><button onclick="saveEditedCard()" class="bg-indigo-600 text-white py-4 rounded-3xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-transform">Salvar</button></div>
+                            <div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Frente / Frase</p><textarea id="editF" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-28 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${fValue}</textarea></div>
+                            ${card.type !== 'cloze' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Verso</p><textarea id="editB" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${bValue}</textarea></div>` : ''}
+                            ${card.type === 'complete' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Exemplo</p><textarea id="editEx" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed italic">${exValue}</textarea></div>` : ''}
+                            ${card.type === 'cloze' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Dica</p><input id="editHint" value="${hintValue}" class="w-full bg-slate-50 border-0 rounded-3xl p-5 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"></div>` : ''}
+                            <div class="grid grid-cols-2 gap-3 pt-4"><button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; clearTempDraft(); render();" class="bg-slate-100 text-slate-500 py-4 rounded-3xl font-bold active:scale-95 transition-transform">Cancelar</button><button onclick="saveEditedCard()" class="bg-indigo-600 text-white py-4 rounded-3xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-transform">Salvar</button></div>
                         </div>
                     </div>
                 </div>
             `;
+        }
+
+        function clearTempDraft() {
+            tempDraft = { f: '', b: '', ex: '', hint: '' };
         }
 
         function openCardPreview(source) {
@@ -601,17 +614,19 @@
                 const card = decks[dIdx].cards.find(c => String(c.id) === String(editingCardId));
                 type = card.type;
                 f = document.getElementById('editF').value;
-                b = document.getElementById('editB') ? document.getElementById('editB').value : card.b;
-                ex = document.getElementById('editEx') ? document.getElementById('editEx').value : card.ex;
-                hint = document.getElementById('editHint') ? document.getElementById('editHint').value : card.hint;
+                b = document.getElementById('editB') ? document.getElementById('editB').value : '';
+                ex = document.getElementById('editEx') ? document.getElementById('editEx').value : '';
+                hint = document.getElementById('editHint') ? document.getElementById('editHint').value : '';
             } else {
-                // Fonte é a tela de criação (AddCard)
                 type = cardSubtype;
                 f = document.getElementById('newF').value;
                 b = document.getElementById('newB') ? document.getElementById('newB').value : "";
                 ex = document.getElementById('newEx') ? document.getElementById('newEx').value : "";
                 hint = document.getElementById('newHint') ? document.getElementById('newHint').value : "";
             }
+            
+            // Salva o que foi digitado no rascunho temporário
+            tempDraft = { f, b, ex, hint };
             
             window.tempPreviewCard = { type, f, b, ex, hint };
             previewFlipped = false;
@@ -690,6 +705,7 @@
                 card.dueDate = new Date().toISOString(); card.wasViewed = false;
                 saveDecks(); showConfirmResetModal = false;
                 if (isEditingFromStudy) { refreshStudyQueue(); isFlipped = false; showHint = false; }
+                clearTempDraft();
                 render();
             }
         }
@@ -702,7 +718,19 @@
             if (card.type !== 'cloze') card.b = document.getElementById('editB').value.trim();
             if (card.type === 'complete') card.ex = document.getElementById('editEx').value.trim();
             if (card.type === 'cloze') card.hint = document.getElementById('editHint').value.trim();
-            saveDecks(); showEditCardModal = false; if (isEditingFromStudy) { const qIdx = studyQueue.findIndex(c => String(c.id) === String(editingCardId)); if (qIdx !== -1) studyQueue[qIdx] = {...card}; render(); } else { showManageCardsModal = true; render(); }
+            
+            saveDecks(); 
+            showEditCardModal = false; 
+            clearTempDraft();
+            
+            if (isEditingFromStudy) { 
+                const qIdx = studyQueue.findIndex(c => String(c.id) === String(editingCardId)); 
+                if (qIdx !== -1) studyQueue[qIdx] = {...card}; 
+                render(); 
+            } else { 
+                showManageCardsModal = true; 
+                render(); 
+            }
         }
 
         function deleteCard(id, fromEditor = false) {
@@ -714,6 +742,7 @@
 
             if (fromEditor) {
                 showEditCardModal = false;
+                clearTempDraft();
                 if (isEditingFromStudy) {
                     isFlipped = false; 
                     showHint = false;
@@ -774,7 +803,7 @@
                                         <i data-lucide="eye" class="w-5 h-5"></i>
                                     </button>
                                 ` : ''}
-                                <button onclick="showAddCardModal=false; render();" class="bg-slate-50 p-2 rounded-xl text-slate-300"><i data-lucide="x" class="w-6 h-6"></i></button>
+                                <button onclick="showAddCardModal=false; clearTempDraft(); render();" class="bg-slate-50 p-2 rounded-xl text-slate-300"><i data-lucide="x" class="w-6 h-6"></i></button>
                             </div>
                         </div>
                         <div class="flex bg-slate-100 p-1.5 rounded-3xl mb-8 text-[9px] font-black uppercase tracking-widest">
@@ -791,10 +820,10 @@
                                 <button onclick="cardSubtype='cloze' ; render();" class="text-[8px] font-black uppercase py-4 border-2 rounded-2xl transition-all ${cardSubtype==='cloze'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-50 text-slate-400'}">Lacuna</button>
                             </div>
                             <div class="space-y-4">
-                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [termo]' : 'Frente'}" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-24 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"></textarea>
-                                ${cardSubtype !== 'cloze' ? `<textarea id="newB" placeholder="Verso" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"></textarea>` : ''}
-                                ${cardSubtype === 'complete' ? `<textarea id="newEx" placeholder="Exemplo" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all italic"></textarea>` : ''}
-                                ${cardSubtype === 'cloze' ? `<input id="newHint" placeholder="Dica" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">` : ''}
+                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [termo]' : 'Frente'}" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-24 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">${tempDraft.f}</textarea>
+                                ${cardSubtype !== 'cloze' ? `<textarea id="newB" placeholder="Verso" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">${tempDraft.b}</textarea>` : ''}
+                                ${cardSubtype === 'complete' ? `<textarea id="newEx" placeholder="Exemplo" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all italic">${tempDraft.ex}</textarea>` : ''}
+                                ${cardSubtype === 'cloze' ? `<input id="newHint" placeholder="Dica" value="${tempDraft.hint}" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">` : ''}
                                 <button onclick="saveSingleCard()" class="w-full bg-indigo-600 text-white py-5 rounded-[2rem] font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all mt-4">Adicionar Card</button>
                             </div>
                         ` : `
@@ -830,9 +859,9 @@
             saveDecks();
             refreshStudyQueue();
             cardAddedFeedback = true;
+            clearTempDraft(); // Limpar rascunho após salvar com sucesso
             render();
             
-            // Re-limpar inputs após renderizar o feedback
             setTimeout(() => {
                 const fNew = document.getElementById('newF');
                 if(fNew) {
