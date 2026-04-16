@@ -1,4 +1,6 @@
 
+
+
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -100,6 +102,7 @@
 
         let previewFlipped = false;
         let previewShowHint = false;
+        window.tempPreviewCard = null;
 
         const saveDecks = () => localStorage.setItem('srs_v22_decks', JSON.stringify(decks));
         const saveConfig = () => localStorage.setItem('srs_config_v22', JSON.stringify(config));
@@ -261,7 +264,7 @@
             return `
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
                     <div class="bg-white rounded-[40px] p-8 w-full max-sm modal-enter shadow-2xl">
-                        <h2 class="text-xl font-black text-slate-800 mb-6 uppercase">New Deck</h2>
+                        <h2 class="text-xl font-black text-slate-800 mb-6 uppercase">Novo Deck</h2>
                         <input id="deckNameInput" placeholder="Ex: Inglês Básico" class="w-full bg-slate-50 border-0 rounded-2xl p-4 mb-4 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
                         <div class="flex gap-2">
                             <button onclick="showAddDeckModal=false; render();" class="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold active:scale-95 transition-transform">Voltar</button>
@@ -553,7 +556,7 @@
                         <div class="flex justify-between items-center mb-8">
                             <h2 class="text-xl font-black text-slate-800 uppercase">Ajustar Card</h2>
                             <div class="flex items-center gap-3">
-                                <button onclick="openCardPreview()" title="Ver prévia interativa" class="bg-indigo-50 text-indigo-600 p-3 rounded-2xl active:scale-90 transition-transform">
+                                <button onclick="openCardPreview('edit')" title="Ver prévia interativa" class="bg-indigo-50 text-indigo-600 p-3 rounded-2xl active:scale-90 transition-transform">
                                     <i data-lucide="eye" class="w-5 h-5"></i>
                                 </button>
                                 <button onclick="deleteCard('${card.id}', true)" class="bg-rose-50 text-rose-500 p-3 rounded-2xl active:scale-90 transition-transform">
@@ -581,7 +584,7 @@
                             </div>
                             <div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Frente / Frase</p><textarea id="editF" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-28 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${card.f}</textarea></div>
                             ${card.type !== 'cloze' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Verso</p><textarea id="editB" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${card.b || ''}</textarea></div>` : ''}
-                            ${card.type === 'complete' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Exemplo</p><textarea id="editEx" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed italic">${card.ex || ''}</textarea></div>` : ''}
+                            ${card.type === 'complete' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Frase Exemplo</p><textarea id="editEx" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed italic">${card.ex || ''}</textarea></div>` : ''}
                             ${card.type === 'cloze' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Dica</p><input id="editHint" value="${card.hint || ''}" class="w-full bg-slate-50 border-0 rounded-3xl p-5 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"></div>` : ''}
                             <div class="grid grid-cols-2 gap-3 pt-4"><button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; render();" class="bg-slate-100 text-slate-500 py-4 rounded-3xl font-bold active:scale-95 transition-transform">Cancelar</button><button onclick="saveEditedCard()" class="bg-indigo-600 text-white py-4 rounded-3xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-transform">Salvar</button></div>
                         </div>
@@ -590,18 +593,27 @@
             `;
         }
 
-        function openCardPreview() {
-            const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
-            const card = decks[dIdx].cards.find(c => String(c.id) === String(editingCardId));
+        function openCardPreview(source) {
+            let f, b, ex, hint, type;
             
-            window.tempPreviewCard = {
-                ...card,
-                f: document.getElementById('editF').value,
-                b: document.getElementById('editB') ? document.getElementById('editB').value : card.b,
-                ex: document.getElementById('editEx') ? document.getElementById('editEx').value : card.ex,
-                hint: document.getElementById('editHint') ? document.getElementById('editHint').value : card.hint
-            };
+            if (source === 'edit') {
+                const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
+                const card = decks[dIdx].cards.find(c => String(c.id) === String(editingCardId));
+                type = card.type;
+                f = document.getElementById('editF').value;
+                b = document.getElementById('editB') ? document.getElementById('editB').value : card.b;
+                ex = document.getElementById('editEx') ? document.getElementById('editEx').value : card.ex;
+                hint = document.getElementById('editHint') ? document.getElementById('editHint').value : card.hint;
+            } else {
+                // Fonte é a tela de criação (AddCard)
+                type = cardSubtype;
+                f = document.getElementById('newF').value;
+                b = document.getElementById('newB') ? document.getElementById('newB').value : "";
+                ex = document.getElementById('newEx') ? document.getElementById('newEx').value : "";
+                hint = document.getElementById('newHint') ? document.getElementById('newHint').value : "";
+            }
             
+            window.tempPreviewCard = { type, f, b, ex, hint };
             previewFlipped = false;
             previewShowHint = false;
             showPreviewModal = true;
@@ -693,7 +705,6 @@
             saveDecks(); showEditCardModal = false; if (isEditingFromStudy) { const qIdx = studyQueue.findIndex(c => String(c.id) === String(editingCardId)); if (qIdx !== -1) studyQueue[qIdx] = {...card}; render(); } else { showManageCardsModal = true; render(); }
         }
 
-        // --- LÓGICA DE EXCLUSÃO AJUSTADA ---
         function deleteCard(id, fromEditor = false) {
             if(!confirm('Excluir permanentemente?')) return;
             
@@ -704,16 +715,13 @@
             if (fromEditor) {
                 showEditCardModal = false;
                 if (isEditingFromStudy) {
-                    // Resetamos o estado visual para garantir que o próximo card apareça de frente
                     isFlipped = false; 
                     showHint = false;
                     studyQueue = studyQueue.filter(c => String(c.id) !== String(id));
                     
-                    // Se o deck ficar vazio, voltamos para casa
-                    if (decks[dIdx].cards.length === 0) {
+                    if (decks[dIdx].cards.length === 0 || studyQueue.length === 0) {
                         view = 'home';
                     } else if (studyQueue.length > 0) {
-                        // Se houver próximo card, fala o texto dele se o autoFront estiver ligado
                         const deck = getCurrentDeck();
                         if (deck.autoFront !== undefined ? deck.autoFront : true) {
                             setTimeout(() => speak(studyQueue[0].f), 300);
@@ -727,7 +735,7 @@
                 showHint = false;
                 studyQueue = studyQueue.filter(c => String(c.id) !== String(id));
                 
-                if (decks[dIdx].cards.length === 0) {
+                if (decks[dIdx].cards.length === 0 || studyQueue.length === 0) {
                     view = 'home';
                 } else if (studyQueue.length > 0) {
                     const deck = getCurrentDeck();
@@ -760,7 +768,14 @@
                     <div class="bg-white rounded-t-[40px] sm:rounded-[40px] p-8 w-full max-w-sm overflow-y-auto max-h-[95vh] modal-enter shadow-2xl">
                         <div class="flex justify-between items-center mb-8">
                             <h2 class="text-xl font-black text-slate-800 uppercase">New Card</h2>
-                            <button onclick="showAddCardModal=false; render();" class="bg-slate-50 p-2 rounded-xl text-slate-300"><i data-lucide="x" class="w-6 h-6"></i></button>
+                            <div class="flex items-center gap-3">
+                                ${addMode === 'single' ? `
+                                    <button onclick="openCardPreview('add')" title="Ver prévia interativa" class="bg-indigo-50 text-indigo-600 p-3 rounded-2xl active:scale-90 transition-transform">
+                                        <i data-lucide="eye" class="w-5 h-5"></i>
+                                    </button>
+                                ` : ''}
+                                <button onclick="showAddCardModal=false; render();" class="bg-slate-50 p-2 rounded-xl text-slate-300"><i data-lucide="x" class="w-6 h-6"></i></button>
+                            </div>
                         </div>
                         <div class="flex bg-slate-100 p-1.5 rounded-3xl mb-8 text-[9px] font-black uppercase tracking-widest">
                             <button onclick="addMode='single'; render();" class="flex-1 py-4 rounded-[1.25rem] transition-all ${addMode==='single'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Individual</button>
@@ -778,8 +793,8 @@
                             <div class="space-y-4">
                                 <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [termo]' : 'Frente'}" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-24 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"></textarea>
                                 ${cardSubtype !== 'cloze' ? `<textarea id="newB" placeholder="Verso" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"></textarea>` : ''}
-                                ${cardSubtype === 'complete' ? `<textarea id="newEx" placeholder="Exemplo" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all italic"></textarea>` : ''}
-                                ${cardSubtype === 'cloze' ? `<input id="newHint" placeholder="Dica (Significado)" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">` : ''}
+                                ${cardSubtype === 'complete' ? `<textarea id="newEx" placeholder="Frase de Exemplo" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all italic"></textarea>` : ''}
+                                ${cardSubtype === 'cloze' ? `<input id="newHint" placeholder="Dica" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">` : ''}
                                 <button onclick="saveSingleCard()" class="w-full bg-indigo-600 text-white py-5 rounded-[2rem] font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all mt-4">Adicionar Card</button>
                             </div>
                         ` : `
@@ -792,7 +807,8 @@
         }
 
         function saveSingleCard() {
-            const f = document.getElementById('newF').value.trim();
+            const fInput = document.getElementById('newF');
+            const f = fInput.value.trim();
             if (!f) return;
             const idx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             
@@ -802,7 +818,7 @@
                 f, 
                 b: cardSubtype === 'cloze' ? '' : document.getElementById('newB').value.trim(), 
                 ex: cardSubtype === 'complete' ? document.getElementById('newEx').value.trim() : '', 
-                hint: cardSubtype === 'cloze' ? document.getElementById('newHint').value.trim() : '', 
+                hint: cardSubtype === 'cloze' ? (document.getElementById('newHint') ? document.getElementById('newHint').value.trim() : '') : '', 
                 interval: 0, 
                 repetition: 0, 
                 efactor: 2.5, 
@@ -815,11 +831,19 @@
             refreshStudyQueue();
             cardAddedFeedback = true;
             render();
-            document.getElementById('newF').value = '';
-            if(document.getElementById('newB')) document.getElementById('newB').value = '';
-            if(document.getElementById('newEx')) document.getElementById('newEx').value = '';
-            if(document.getElementById('newHint')) document.getElementById('newHint').value = '';
-            setTimeout(() => { document.getElementById('newF').focus(); }, 50);
+            
+            // Re-limpar inputs após renderizar o feedback
+            setTimeout(() => {
+                const fNew = document.getElementById('newF');
+                if(fNew) {
+                    fNew.value = '';
+                    if(document.getElementById('newB')) document.getElementById('newB').value = '';
+                    if(document.getElementById('newEx')) document.getElementById('newEx').value = '';
+                    if(document.getElementById('newHint')) document.getElementById('newHint').value = '';
+                    fNew.focus();
+                }
+            }, 50);
+
             setTimeout(() => {
                 cardAddedFeedback = false;
                 if(showAddCardModal) render();
