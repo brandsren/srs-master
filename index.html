@@ -402,7 +402,7 @@
                 ` : `
                     <div class="text-center py-20 bg-white rounded-[40px] p-8 shadow-sm flex flex-col items-center">
                         <div class="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-6"><i data-lucide="check-circle-2" class="w-10 h-10"></i></div>
-                        <h2 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Tudo Limpo!</h2>
+                        <h2 class="text-2xl font-black text-slate-800 uppercase tracking-tight">All good!</h2>
                         <button onclick="view='home'; render();" class="mt-8 bg-indigo-600 text-white px-12 py-4 rounded-2xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all">Voltar ao Início</button>
                     </div>
                 `}
@@ -662,10 +662,10 @@
                                 <button onclick="cardSubtype='cloze' ; render();" class="text-[8px] font-black uppercase py-4 border-2 rounded-2xl transition-all ${cardSubtype==='cloze'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-50 text-slate-400'}">Lacuna</button>
                             </div>
                             <div class="space-y-4">
-                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [termo] {pronúncia}' : 'Frente do Card'}" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-24 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"></textarea>
-                                ${cardSubtype !== 'cloze' ? `<textarea id="newB" placeholder="Verso (Tradução)" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"></textarea>` : ''}
+                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [termo]' : 'Frente'}" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-24 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"></textarea>
+                                ${cardSubtype !== 'cloze' ? `<textarea id="newB" placeholder="Verso" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"></textarea>` : ''}
                                 ${cardSubtype === 'complete' ? `<textarea id="newEx" placeholder="Frase de Exemplo" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all italic"></textarea>` : ''}
-                                ${cardSubtype === 'cloze' ? `<input id="newHint" placeholder="Dica (Significado)" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">` : ''}
+                                ${cardSubtype === 'cloze' ? `<input id="newHint" placeholder="Dica" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">` : ''}
                                 <button onclick="saveSingleCard()" class="w-full bg-indigo-600 text-white py-5 rounded-[2rem] font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all mt-4">Adicionar Card</button>
                             </div>
                         ` : `
