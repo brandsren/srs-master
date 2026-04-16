@@ -19,7 +19,7 @@
         
         body { 
             -webkit-tap-highlight-color: transparent; 
-            padding-top: calc(var(--sat) + 60px);
+            padding-top: calc(var(--sat) + 50px);
             padding-bottom: calc(var(--sab) + 0px);
             background-color: #f8fafc;
             min-height: 100vh;
@@ -42,6 +42,15 @@
             border-bottom: 2px solid #6366f1;
         }
 
+        .extra-note {
+            display: block;
+            margin-top: 8px;
+            color: #94a3b8;
+            font-size: 0.7em;
+            font-weight: 500;
+            line-height: 1.2;
+        }
+
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
@@ -53,23 +62,6 @@
         }
         .urgent-alert {
             animation: pulse-red 2s infinite;
-        }
-
-        .extra-note {
-            display: block; 
-            font-size: 0.7rem;
-            color: #94a3b8;
-            font-weight: 600;
-            margin-top: 8px; 
-            font-style: normal;
-            line-height: 1.2;
-            text-transform: none;
-        }
-
-        /* Feedback de sucesso ao salvar card */
-        .btn-success {
-            background-color: #10b981 !important;
-            transform: scale(1.05);
         }
     </style>
 </head>
@@ -95,6 +87,7 @@
         let showExportModal = false;
         let showStudyConfigModal = false;
         let showConfirmResetModal = false;
+        let cardAddedFeedback = false;
         
         let editingCardId = null;
         let isEditingFromStudy = false;
@@ -127,22 +120,6 @@
 
         const isNewCard = (card) => !card.wasViewed;
         const getCurrentDeck = () => decks.find(d => String(d.id) === String(currentDeckId));
-
-        const processContent = (text) => {
-            if (!text) return "";
-            return text.replace(/\{(.*?)\}/g, '<span class="extra-note">$1</span>');
-        };
-
-        const processExemplo = (text) => {
-            if (!text) return "";
-            let note = "";
-            let cleanText = text.replace(/\{(.*?)\}/g, (match, p1) => {
-                note = `<span class="extra-note text-indigo-300/80">${p1}</span>`;
-                return "";
-            }).trim();
-            
-            return `<span class="italic">"${cleanText}"</span>${note}`;
-        };
 
         const refreshStudyQueue = () => {
             const deck = getCurrentDeck();
@@ -177,13 +154,44 @@
         function speak(text, callback) {
             if (!text) { if(callback) callback(); return; }
             window.speechSynthesis.cancel();
-            let cleanText = text.replace(/\[(.*?)\]/g, '$1').replace(/\{.*?\}/g, "").trim();
-
-            const utterance = new SpeechSynthesisUtterance(cleanText);
+            let cleanText = text.replace(/\[(.*?)\]/g, '$1'); 
+            cleanText = cleanText.replace(/\{.*?\}/g, '');
+            const utterance = new SpeechSynthesisUtterance(cleanText.trim());
             utterance.lang = 'en-US';
             utterance.rate = 0.85; 
             utterance.onend = () => { if(callback) callback(); };
             window.speechSynthesis.speak(utterance);
+        }
+
+        // --- FORMATADOR DE TEXTO VISUAL ATUALIZADO ---
+        function formatCardText(text, isBack = false) {
+            if (!text) return "";
+            
+            // 1. Extrair e remover notas entre chaves
+            let notes = [];
+            let formatted = text.replace(/\{(.*?)\}/g, (match, p1) => {
+                notes.push(p1);
+                return "";
+            });
+
+            // 2. Tratar Cloze/Lacuna
+            if (formatted.includes('[') && formatted.includes(']')) {
+                if (!isBack) {
+                    formatted = formatted.replace(/\[(.*?)\]/g, '<span class="cloze-placeholder">...</span>');
+                } else {
+                    formatted = formatted.replace(/\[(.*?)\]/g, '<span class="bg-yellow-300 text-slate-900 px-2 rounded-lg">$1</span>');
+                }
+            }
+
+            // 3. Montar HTML final: Texto principal + Notas em linha abaixo
+            let html = `<span>${formatted}</span>`;
+            if (notes.length > 0) {
+                notes.forEach(note => {
+                    html += `<span class="extra-note">${note}</span>`;
+                });
+            }
+            
+            return html;
         }
 
         function toggleAudioSetting(key) {
@@ -218,6 +226,7 @@
                 <div class="space-y-4">
                     ${decks.length === 0 ? `
                         <div class="text-center py-20 bg-white rounded-[40px] border-2 border-dashed border-slate-200 p-8">
+                            <i data-lucide="layers" class="w-12 h-12 text-slate-200 mx-auto mb-4"></i>
                             <p class="text-slate-400 font-medium">Nenhum deck criado.</p>
                         </div>
                     ` : decks.map(deck => {
@@ -341,7 +350,7 @@
                     <div class="flex gap-2">
                         <button onclick="showStudyConfigModal=true; render();" class="bg-white text-slate-600 p-2 rounded-xl border border-slate-100 shadow-sm active:scale-95 transition-all"><i data-lucide="sliders-horizontal" class="w-5 h-5"></i></button>
                         <button onclick="showManageCardsModal=true; searchTerm=''; showOnlyErrors=false; render();" class="bg-white text-slate-600 p-2 rounded-xl border border-slate-100 shadow-sm active:scale-95 transition-all"><i data-lucide="list" class="w-5 h-5"></i></button>
-                        <button onclick="showAddCardModal=true; render();" class="bg-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-100 active:scale-95 transition-all"><i data-lucide="plus" class="w-5 h-5"></i></button>
+                        <button onclick="showAddCardModal=true; cardAddedFeedback=false; render();" class="bg-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-100 active:scale-95 transition-all"><i data-lucide="plus" class="w-5 h-5"></i></button>
                     </div>
                 </div>
 
@@ -359,13 +368,11 @@
                                 </div>
                                 <span class="absolute top-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">${isNewCard(card) ? 'Card Novo' : (card.interval === 0 ? 'Repetição Imediata' : 'Revisão Agendada')}</span>
                                 <div class="text-2xl font-bold text-slate-800 leading-tight">
-                                    ${card.type === 'cloze' 
-                                        ? processContent(card.f.replace(/\[(.*?)\]/g, '<span class="cloze-placeholder">...</span>')) 
-                                        : processContent(card.f)}
+                                    ${formatCardText(card.f, false)}
                                 </div>
                                 ${card.type === 'cloze' && card.hint ? `
                                     <div class="mt-10">
-                                        ${showHint ? `<div class="text-[11px] font-bold text-indigo-500 bg-indigo-50 px-6 py-4 rounded-3xl border border-indigo-100 flex items-center gap-2 text-left"><i data-lucide="lightbulb" class="w-4 h-4 shrink-0"></i> <div>Dica: ${processContent(card.hint)}</div></div>` : `
+                                        ${showHint ? `<div class="text-[11px] font-bold text-indigo-500 bg-indigo-50 px-6 py-4 rounded-3xl border border-indigo-100 flex items-center gap-2"><i data-lucide="lightbulb" class="w-4 h-4"></i> Dica: ${card.hint}</div>` : `
                                             <button onclick="event.stopPropagation(); showHint=true; render();" class="text-[10px] font-black uppercase tracking-widest text-slate-400 border border-slate-200 px-6 py-2.5 rounded-full hover:bg-slate-50 transition-colors">💡 Mostrar Dica</button>
                                         `}
                                     </div>
@@ -376,11 +383,9 @@
                                     <button onclick="event.stopPropagation(); startEditCard('${card.id}', true)" class="bg-white/10 text-indigo-100 p-3 rounded-2xl active:scale-90 transition-transform"><i data-lucide="edit-3" class="w-5 h-5"></i></button>
                                 </div>
                                 <div class="text-2xl font-bold text-white mb-8">
-                                    ${card.type === 'cloze' 
-                                        ? processContent(card.f.replace(/\[(.*?)\]/g, '<span class="bg-yellow-300 text-slate-900 px-2 rounded-lg">$1</span>')) 
-                                        : processContent(card.f)}
+                                    ${card.type === 'cloze' ? formatCardText(card.f, true) : formatCardText(card.b, true)}
                                 </div>
-                                ${card.ex ? `<div class="bg-indigo-700/40 p-5 rounded-[2rem] border border-white/10 text-left w-full shadow-inner"><p class="text-[8px] font-black text-indigo-300 uppercase mb-2 tracking-[0.1em] flex items-center gap-1.5"><i data-lucide="quote" class="w-2.5 h-2.5"></i> Exemplo</p><p class="text-sm text-white/90 leading-relaxed">${processExemplo(card.ex)}</p></div>` : ''}
+                                ${card.ex ? `<div class="bg-indigo-700/40 p-5 rounded-[2rem] border border-white/10 text-left w-full shadow-inner"><p class="text-[8px] font-black text-indigo-300 uppercase mb-2 tracking-[0.1em] flex items-center gap-1.5"><i data-lucide="quote" class="w-2.5 h-2.5"></i> Exemplo</p><p class="text-sm text-white/90 italic leading-relaxed">"${formatCardText(card.ex, true)}"</p></div>` : ''}
                                 <button onclick="event.stopPropagation(); triggerVersoAudio('${card.id}')" class="mt-8 text-white bg-white/20 w-14 h-14 rounded-full flex items-center justify-center active:scale-90 transition-all hover:bg-white/30 shadow-lg"><i data-lucide="volume-2" class="w-6 h-6"></i></button>
                             </div>
                         </div>
@@ -517,7 +522,7 @@
                             ${(c.lapses || 0) > 0 ? `<span class="text-[7px] font-black uppercase px-2 py-1 rounded-lg bg-rose-50 text-rose-600 tracking-wider flex items-center gap-1"><i data-lucide="alert-circle" class="w-2.5 h-2.5"></i> ${c.lapses} erros</span>` : ''}
                             <span class="text-[8px] font-bold text-slate-400 uppercase tracking-tighter ml-auto flex items-center gap-1"><i data-lucide="calendar" class="w-2.5 h-2.5"></i> ${formatDate(c.dueDate)}</span>
                         </div>
-                        <div class="font-bold text-slate-800 truncate text-sm">${c.f.replace(/\{.*?\}/g, "")}</div>
+                        <div class="font-bold text-slate-800 truncate text-sm">${c.f}</div>
                     </div>
                     <div class="text-slate-200"><i data-lucide="chevron-right" class="w-5 h-5"></i></div>
                 </div>
@@ -535,7 +540,7 @@
             if (!card) return '';
             return `
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-6">
-                    <div class="bg-white rounded-t-[40px] sm:rounded-[40px] p-8 w-full max-w-sm overflow-y-auto max-h-[95vh] modal-enter relative shadow-2xl">
+                    <div class="bg-white rounded-t-[40px] sm:rounded-[40px] p-8 w-full max-sm overflow-y-auto max-h-[95vh] modal-enter relative shadow-2xl">
                         <div class="flex justify-between items-center mb-8">
                             <h2 class="text-xl font-black text-slate-800 uppercase">Ajustar Card</h2>
                             <div class="flex items-center gap-3">
@@ -549,10 +554,17 @@
                                     <p class="text-[9px] font-black text-amber-600 uppercase mb-1 tracking-widest">Estado do Card</p>
                                     <p class="text-[11px] font-bold text-amber-800">${isNewCard(card) ? 'Este card já é novo' : 'Card em aprendizado'}</p>
                                 </div>
-                                ${!isNewCard(card) ? `<button onclick="showConfirmResetModal=true; render();" class="text-[9px] font-black text-white bg-amber-500 px-4 py-2.5 rounded-2xl uppercase active:scale-95 transition-all shadow-sm">Resetar Respostas</button>` : ''}
+                                ${!isNewCard(card) ? `
+                                    <button onclick="showConfirmResetModal=true; render();" class="text-[9px] font-black text-white bg-amber-500 px-4 py-2.5 rounded-2xl uppercase active:scale-95 transition-all shadow-sm">Resetar</button>
+                                ` : ''}
                             </div>
-                            <div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Frente / Frase <span class="text-indigo-400 normal-case">(notas em { })</span></p><textarea id="editF" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-28 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${card.f}</textarea></div>
-                            ${card.type !== 'cloze' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Verso</p><textarea id="editB" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${card.b || ''}</textarea></div>` : ''}
+
+                            <div class="flex justify-between items-center bg-slate-50 p-4 rounded-3xl border border-slate-100">
+                                <div><p class="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Performance</p><div class="text-[11px] font-bold text-slate-700">Erros acumulados: <span class="${(card.lapses || 0) > 0 ? 'text-rose-500' : 'text-emerald-500'}">${card.lapses || 0}</span></div></div>
+                                ${(card.lapses || 0) > 0 ? `<button onclick="const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId)); const cIdx = decks[dIdx].cards.findIndex(c => String(c.id) === String(editingCardId)); decks[dIdx].cards[cIdx].lapses = 0; saveDecks(); render();" class="text-[9px] font-black text-indigo-600 bg-white border border-indigo-100 px-4 py-2.5 rounded-2xl uppercase active:scale-95 transition-all shadow-sm">Zerar Erros</button>` : ''}
+                            </div>
+                            <div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Frente / Frase</p><textarea id="editF" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-28 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${card.f}</textarea></div>
+                            ${card.type !== 'cloze' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Verso (Tradução)</p><textarea id="editB" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${card.b || ''}</textarea></div>` : ''}
                             ${card.type === 'complete' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Frase Exemplo</p><textarea id="editEx" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed italic">${card.ex || ''}</textarea></div>` : ''}
                             ${card.type === 'cloze' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Dica (Significado)</p><input id="editHint" value="${card.hint || ''}" class="w-full bg-slate-50 border-0 rounded-3xl p-5 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"></div>` : ''}
                             <div class="grid grid-cols-2 gap-3 pt-4"><button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; render();" class="bg-slate-100 text-slate-500 py-4 rounded-3xl font-bold active:scale-95 transition-transform">Cancelar</button><button onclick="saveEditedCard()" class="bg-indigo-600 text-white py-4 rounded-3xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-transform">Salvar</button></div>
@@ -585,7 +597,8 @@
             const cIdx = decks[dIdx].cards.findIndex(c => String(c.id) === String(editingCardId));
             if (cIdx !== -1) {
                 const card = decks[dIdx].cards[cIdx];
-                card.interval = 0; card.repetition = 0; card.efactor = 2.5; card.lapses = 0; card.dueDate = new Date().toISOString(); card.wasViewed = false;
+                card.interval = 0; card.repetition = 0; card.efactor = 2.5; card.lapses = 0;
+                card.dueDate = new Date().toISOString(); card.wasViewed = false;
                 saveDecks(); showConfirmResetModal = false;
                 if (isEditingFromStudy) { refreshStudyQueue(); isFlipped = false; showHint = false; }
                 render();
@@ -626,6 +639,7 @@
             `;
         }
 
+        // --- ATUALIZADO: RENDERIZAÇÃO DO MODAL DE ADIÇÃO PARA MANTER ABERTO ---
         function renderAddCardModal() {
             return `
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
@@ -638,6 +652,9 @@
                             <button onclick="addMode='single'; render();" class="flex-1 py-4 rounded-[1.25rem] transition-all ${addMode==='single'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Individual</button>
                             <button onclick="addMode='bulk'; render();" class="flex-1 py-4 rounded-[1.25rem] transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Importar</button>
                         </div>
+
+                        ${cardAddedFeedback ? `<div class="bg-emerald-50 text-emerald-600 text-[10px] font-bold py-3 px-4 rounded-2xl mb-4 text-center animate-pulse border border-emerald-100 flex items-center justify-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Card Adicionado!</div>` : ''}
+
                         ${addMode === 'single' ? `
                             <div class="grid grid-cols-3 gap-2 mb-8">
                                 <button onclick="cardSubtype='basic'; render();" class="text-[8px] font-black uppercase py-4 border-2 rounded-2xl transition-all ${cardSubtype==='basic'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-50 text-slate-400'}">Card 1</button>
@@ -645,16 +662,14 @@
                                 <button onclick="cardSubtype='cloze' ; render();" class="text-[8px] font-black uppercase py-4 border-2 rounded-2xl transition-all ${cardSubtype==='cloze'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-50 text-slate-400'}">Lacuna</button>
                             </div>
                             <div class="space-y-4">
-                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [termo]' : 'Frente {notas}'}" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-24 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"></textarea>
-                                ${cardSubtype !== 'cloze' ? `<textarea id="newB" placeholder="Verso {notas}" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"></textarea>` : ''}
+                                <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [termo] {pronúncia}' : 'Frente do Card'}" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-24 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"></textarea>
+                                ${cardSubtype !== 'cloze' ? `<textarea id="newB" placeholder="Verso (Tradução)" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"></textarea>` : ''}
                                 ${cardSubtype === 'complete' ? `<textarea id="newEx" placeholder="Frase de Exemplo" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all italic"></textarea>` : ''}
                                 ${cardSubtype === 'cloze' ? `<input id="newHint" placeholder="Dica (Significado)" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">` : ''}
-                                <button id="saveCardBtn" onclick="saveSingleCard()" class="w-full bg-indigo-600 text-white py-5 rounded-[2rem] font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all mt-4 flex items-center justify-center gap-2">
-                                    <i data-lucide="plus" class="w-5 h-5"></i> Adicionar Card
-                                </button>
+                                <button onclick="saveSingleCard()" class="w-full bg-indigo-600 text-white py-5 rounded-[2rem] font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all mt-4">Adicionar Card</button>
                             </div>
                         ` : `
-                            <textarea id="bulkData" placeholder="Ex: I [love] coffee;Eu amo café" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-64 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-[10px] shadow-inner"></textarea>
+                            <textarea id="bulkData" placeholder="Ex: I drink [coffee] {kó-fi};café" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-64 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-[10px] shadow-inner"></textarea>
                             <button onclick="saveBulkCards()" class="w-full bg-indigo-600 text-white py-5 rounded-[2rem] font-bold mt-6 shadow-lg shadow-indigo-100 active:scale-95 transition-all">Iniciar Importação</button>
                         `}
                     </div>
@@ -662,6 +677,7 @@
             `;
         }
 
+        // --- ATUALIZADO: SALVAR E LIMPAR CAMPOS SEM FECHAR O MODAL ---
         function saveSingleCard() {
             const f = document.getElementById('newF').value.trim();
             if (!f) return;
@@ -684,26 +700,27 @@
             
             saveDecks();
             refreshStudyQueue();
-
-            // Feedback visual e Reset dos campos sem fechar
-            const btn = document.getElementById('saveCardBtn');
-            const originalHTML = btn.innerHTML;
-            btn.classList.add('btn-success');
-            btn.innerHTML = '<i data-lucide="check" class="w-5 h-5"></i> Salvo!';
-            lucide.createIcons();
-
-            // Limpa campos
+            
+            // Feedback e limpeza
+            cardAddedFeedback = true;
+            render();
+            
+            // Limpa campos específicos
             document.getElementById('newF').value = '';
-            if (cardSubtype !== 'cloze') document.getElementById('newB').value = '';
-            if (cardSubtype === 'complete') document.getElementById('newEx').value = '';
-            if (cardSubtype === 'cloze') document.getElementById('newHint').value = '';
-            document.getElementById('newF').focus();
-
+            if(document.getElementById('newB')) document.getElementById('newB').value = '';
+            if(document.getElementById('newEx')) document.getElementById('newEx').value = '';
+            if(document.getElementById('newHint')) document.getElementById('newHint').value = '';
+            
+            // Foco volta para o campo principal
             setTimeout(() => {
-                btn.classList.remove('btn-success');
-                btn.innerHTML = originalHTML;
-                lucide.createIcons();
-            }, 800);
+                document.getElementById('newF').focus();
+            }, 50);
+
+            // Remove o aviso de feedback após 2 segundos
+            setTimeout(() => {
+                cardAddedFeedback = false;
+                if(showAddCardModal) render();
+            }, 2000);
         }
 
         function saveBulkCards() {
@@ -719,10 +736,7 @@
                     decks[idx].cards.push({ id: Date.now()+i+Math.random(), type, f, b: type==='cloze'?'':b, ex, hint, interval: 0, repetition: 0, efactor: 2.5, lapses: 0, dueDate: new Date().toISOString(), wasViewed: false });
                 }
             });
-            saveDecks();
-            showAddCardModal = false; // Fecha no modo Importar
-            refreshStudyQueue();
-            render();
+            saveDecks(); showAddCardModal = false; refreshStudyQueue(); render();
         }
 
         render();
