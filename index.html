@@ -98,9 +98,7 @@
         let searchTerm = '';
         let showOnlyErrors = false;
 
-        // Estado temporário para persistir dados entre Prévia e Edição/Criação
         let tempDraft = { f: '', b: '', ex: '', hint: '' };
-
         let previewFlipped = false;
         let previewShowHint = false;
         window.tempPreviewCard = null;
@@ -129,6 +127,15 @@
         const isNewCard = (card) => !card.wasViewed;
         const getCurrentDeck = () => decks.find(d => String(d.id) === String(currentDeckId));
 
+        const shuffleArray = (arr) => {
+            let a = [...arr];
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[j], a[i]] = [a[i], a[j]];
+            }
+            return a;
+        };
+
         const refreshStudyQueue = () => {
             const deck = getCurrentDeck();
             if (!deck || !deck.cards) {
@@ -136,27 +143,32 @@
                 return;
             }
             const now = new Date();
+            
+            // Filtra apenas os cards que devem ser estudados hoje ou novos
             let allDue = deck.cards.filter(c => isNewCard(c) || new Date(c.dueDate) <= now);
+            
+            // Separação em baldes de prioridade
             const errorCards = allDue.filter(c => !isNewCard(c) && c.interval === 0);
             const newCards = allDue.filter(c => isNewCard(c));
             const reviewCards = allDue.filter(c => !isNewCard(c) && c.interval > 0);
 
-            const shuffleArray = (arr) => {
-                if (!config.shuffle) return arr;
-                let a = [...arr];
-                for (let i = a.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [a[j], a[i]] = [a[j], a[i]]
-                }
-                return a;
-            };
+            // Embaralha cada balde individualmente se a opção de shuffle estiver ativa
+            const sErrors = config.shuffle ? shuffleArray(errorCards) : errorCards;
+            const sNew = config.shuffle ? shuffleArray(newCards) : newCards;
+            const sReview = config.shuffle ? shuffleArray(reviewCards) : reviewCards;
 
-            const sErrors = shuffleArray(errorCards);
-            const sNew = shuffleArray(newCards);
-            const sReview = shuffleArray(reviewCards);
+            // Define a ordem final baseada na configuração de prioridade
+            if (config.prioritizeNew) {
+                // Erros Críticos > Novos > Revisões
+                studyQueue = [...sErrors, ...sNew, ...sReview];
+            } else {
+                // Erros Críticos > Revisões > Novos
+                studyQueue = [...sErrors, ...sReview, ...sNew];
+            }
 
-            if (config.prioritizeNew) studyQueue = [...sErrors, ...sNew, ...sReview];
-            else studyQueue = [...sErrors, ...sReview, ...sNew];
+            // Se o usuário quer um shuffle TOTAL (misturar tudo sem respeitar prioridade de novos/revisão)
+            // Descomente a linha abaixo se quiser que o shuffle ignore a separação de categorias.
+            // if (config.shuffle) studyQueue = shuffleArray(studyQueue);
         };
 
         function speak(text, callback) {
@@ -323,7 +335,7 @@
                                 </div>
                             </div>
                             <div>
-                                <p class="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest flex items-center gap-2"><i data-lucide="shuffle" class="w-3 h-3"></i> Ordem Interna</p>
+                                <p class="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest flex items-center gap-2"><i data-lucide="shuffle" class="w-3 h-3"></i> Ordem dos Cards</p>
                                 <div class="grid grid-cols-2 gap-2">
                                     <button onclick="config.shuffle=false; saveConfig(); refreshStudyQueue(); render();" class="py-3 px-2 rounded-2xl text-[10px] font-bold border transition-all ${!config.shuffle ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-50 border-slate-100 text-slate-500'}">Sequencial</button>
                                     <button onclick="config.shuffle=true; saveConfig(); refreshStudyQueue(); render();" class="py-3 px-2 rounded-2xl text-[10px] font-bold border transition-all ${config.shuffle ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-50 border-slate-100 text-slate-500'}">Aleatória</button>
@@ -402,7 +414,7 @@
                 ` : `
                     <div class="text-center py-20 bg-white rounded-[40px] p-8 shadow-sm flex flex-col items-center">
                         <div class="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-6"><i data-lucide="check-circle-2" class="w-10 h-10"></i></div>
-                        <h2 class="text-2xl font-black text-slate-800 tracking-tight">All good!</h2>
+                        <h2 class="text-2xl font-black text-slate-800 tracking-tight">Tudo pronto!</h2>
                         <button onclick="view='home'; render();" class="mt-8 bg-indigo-600 text-white px-12 py-4 rounded-2xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all">Voltar ao Início</button>
                     </div>
                 `}
@@ -461,6 +473,7 @@
                 const pastDate = new Date();
                 pastDate.setMinutes(pastDate.getMinutes() - 1);
                 card.dueDate = pastDate.toISOString();
+                // Move para o final da fila atual para repetição imediata
                 studyQueue.push(studyQueue.shift());
             }
 
@@ -544,7 +557,7 @@
 
         function startEditCard(id, fromStudy = false) { 
             editingCardId = id; isEditingFromStudy = fromStudy;
-            clearTempDraft(); // Limpar rascunho antes de editar um card existente
+            clearTempDraft();
             showEditCardModal = true; showManageCardsModal = false; render(); 
         }
 
@@ -553,7 +566,6 @@
             const card = decks[dIdx].cards.find(c => String(c.id) === String(editingCardId));
             if (!card) return '';
 
-            // Se o rascunho estiver vazio (primeira abertura), carregar do card
             const fValue = tempDraft.f || card.f;
             const bValue = card.type !== 'cloze' ? (tempDraft.b || card.b) : '';
             const exValue = card.type === 'complete' ? (tempDraft.ex || card.ex) : '';
@@ -625,9 +637,7 @@
                 hint = document.getElementById('newHint') ? document.getElementById('newHint').value : "";
             }
             
-            // Salva o que foi digitado no rascunho temporário
             tempDraft = { f, b, ex, hint };
-            
             window.tempPreviewCard = { type, f, b, ex, hint };
             previewFlipped = false;
             previewShowHint = false;
@@ -859,7 +869,7 @@
             saveDecks();
             refreshStudyQueue();
             cardAddedFeedback = true;
-            clearTempDraft(); // Limpar rascunho após salvar com sucesso
+            clearTempDraft();
             render();
             
             setTimeout(() => {
