@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -131,7 +132,7 @@
             let a = [...arr];
             for (let i = a.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
-                [a[j], a[i]] = [a[i], a[j]];
+                [a[j], a[i]] = [a[j], a[i]];
             }
             return a;
         };
@@ -143,32 +144,20 @@
                 return;
             }
             const now = new Date();
-            
-            // Filtra apenas os cards que devem ser estudados hoje ou novos
             let allDue = deck.cards.filter(c => isNewCard(c) || new Date(c.dueDate) <= now);
-            
-            // Separação em baldes de prioridade
             const errorCards = allDue.filter(c => !isNewCard(c) && c.interval === 0);
             const newCards = allDue.filter(c => isNewCard(c));
             const reviewCards = allDue.filter(c => !isNewCard(c) && c.interval > 0);
 
-            // Embaralha cada balde individualmente se a opção de shuffle estiver ativa
             const sErrors = config.shuffle ? shuffleArray(errorCards) : errorCards;
             const sNew = config.shuffle ? shuffleArray(newCards) : newCards;
             const sReview = config.shuffle ? shuffleArray(reviewCards) : reviewCards;
 
-            // Define a ordem final baseada na configuração de prioridade
             if (config.prioritizeNew) {
-                // Erros Críticos > Novos > Revisões
                 studyQueue = [...sErrors, ...sNew, ...sReview];
             } else {
-                // Erros Críticos > Revisões > Novos
                 studyQueue = [...sErrors, ...sReview, ...sNew];
             }
-
-            // Se o usuário quer um shuffle TOTAL (misturar tudo sem respeitar prioridade de novos/revisão)
-            // Descomente a linha abaixo se quiser que o shuffle ignore a separação de categorias.
-            // if (config.shuffle) studyQueue = shuffleArray(studyQueue);
         };
 
         function speak(text, callback) {
@@ -414,7 +403,7 @@
                 ` : `
                     <div class="text-center py-20 bg-white rounded-[40px] p-8 shadow-sm flex flex-col items-center">
                         <div class="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-6"><i data-lucide="check-circle-2" class="w-10 h-10"></i></div>
-                        <h2 class="text-2xl font-black text-slate-800 tracking-tight">Tudo pronto!</h2>
+                        <h2 class="text-2xl font-black text-slate-800 tracking-tight">All good!</h2>
                         <button onclick="view='home'; render();" class="mt-8 bg-indigo-600 text-white px-12 py-4 rounded-2xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all">Voltar ao Início</button>
                     </div>
                 `}
@@ -473,7 +462,6 @@
                 const pastDate = new Date();
                 pastDate.setMinutes(pastDate.getMinutes() - 1);
                 card.dueDate = pastDate.toISOString();
-                // Move para o final da fila atual para repetição imediata
                 studyQueue.push(studyQueue.shift());
             }
 
@@ -713,8 +701,13 @@
                 const card = decks[dIdx].cards[cIdx];
                 card.interval = 0; card.repetition = 0; card.efactor = 2.5; card.lapses = 0;
                 card.dueDate = new Date().toISOString(); card.wasViewed = false;
-                saveDecks(); showConfirmResetModal = false;
-                if (isEditingFromStudy) { refreshStudyQueue(); isFlipped = false; showHint = false; }
+                saveDecks(); 
+                showConfirmResetModal = false;
+                
+                if (isEditingFromStudy) {
+                    const qIdx = studyQueue.findIndex(c => String(c.id) === String(editingCardId));
+                    if (qIdx !== -1) studyQueue[qIdx] = {...card};
+                }
                 clearTempDraft();
                 render();
             }
@@ -724,6 +717,7 @@
             const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             const cIdx = decks[dIdx].cards.findIndex(c => String(c.id) === String(editingCardId));
             const card = decks[dIdx].cards[cIdx];
+            
             card.f = document.getElementById('editF').value.trim();
             if (card.type !== 'cloze') card.b = document.getElementById('editB').value.trim();
             if (card.type === 'complete') card.ex = document.getElementById('editEx').value.trim();
@@ -731,16 +725,17 @@
             
             saveDecks(); 
             showEditCardModal = false; 
-            clearTempDraft();
             
             if (isEditingFromStudy) { 
                 const qIdx = studyQueue.findIndex(c => String(c.id) === String(editingCardId)); 
                 if (qIdx !== -1) studyQueue[qIdx] = {...card}; 
+                // NÃO limpamos isFlipped para que o usuário continue no verso se já estava lá
                 render(); 
             } else { 
                 showManageCardsModal = true; 
                 render(); 
             }
+            clearTempDraft();
         }
 
         function deleteCard(id, fromEditor = false) {
@@ -757,15 +752,7 @@
                     isFlipped = false; 
                     showHint = false;
                     studyQueue = studyQueue.filter(c => String(c.id) !== String(id));
-                    
-                    if (decks[dIdx].cards.length === 0 || studyQueue.length === 0) {
-                        view = 'home';
-                    } else if (studyQueue.length > 0) {
-                        const deck = getCurrentDeck();
-                        if (deck.autoFront !== undefined ? deck.autoFront : true) {
-                            setTimeout(() => speak(studyQueue[0].f), 300);
-                        }
-                    }
+                    if (decks[dIdx].cards.length === 0 || studyQueue.length === 0) view = 'home';
                 } else {
                     showManageCardsModal = true;
                 }
@@ -773,15 +760,7 @@
                 isFlipped = false;
                 showHint = false;
                 studyQueue = studyQueue.filter(c => String(c.id) !== String(id));
-                
-                if (decks[dIdx].cards.length === 0 || studyQueue.length === 0) {
-                    view = 'home';
-                } else if (studyQueue.length > 0) {
-                    const deck = getCurrentDeck();
-                    if (deck.autoFront !== undefined ? deck.autoFront : true) {
-                        setTimeout(() => speak(studyQueue[0].f), 300);
-                    }
-                }
+                if (decks[dIdx].cards.length === 0 || studyQueue.length === 0) view = 'home';
             }
             render();
         }
@@ -867,7 +846,8 @@
             });
             
             saveDecks();
-            refreshStudyQueue();
+            // Ao adicionar um card durante o estudo, ele vai para o final da fila se refresh for chamado.
+            // Aqui optamos por não dar refresh total para não perder o card atual que está sendo estudado.
             cardAddedFeedback = true;
             clearTempDraft();
             render();
@@ -902,7 +882,7 @@
                     decks[idx].cards.push({ id: Date.now()+i+Math.random(), type, f, b: type==='cloze'?'':b, ex, hint, interval: 0, repetition: 0, efactor: 2.5, lapses: 0, dueDate: new Date().toISOString(), wasViewed: false });
                 }
             });
-            saveDecks(); showAddCardModal = false; refreshStudyQueue(); render();
+            saveDecks(); showAddCardModal = false; render();
         }
 
         render();
