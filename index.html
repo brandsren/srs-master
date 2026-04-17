@@ -128,11 +128,12 @@
         const isNewCard = (card) => !card.wasViewed;
         const getCurrentDeck = () => decks.find(d => String(d.id) === String(currentDeckId));
 
+        // CORREÇÃO: Função de embaralhar corrigida (Fisher-Yates)
         const shuffleArray = (arr) => {
             let a = [...arr];
             for (let i = a.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
-                [a[j], a[i]] = [a[j], a[i]];
+                [a[i], a[j]] = [a[j], a[i]];
             }
             return a;
         };
@@ -145,10 +146,12 @@
             }
             const now = new Date();
             let allDue = deck.cards.filter(c => isNewCard(c) || new Date(c.dueDate) <= now);
+            
             const errorCards = allDue.filter(c => !isNewCard(c) && c.interval === 0);
             const newCards = allDue.filter(c => isNewCard(c));
             const reviewCards = allDue.filter(c => !isNewCard(c) && c.interval > 0);
 
+            // Aplica embaralhamento se configurado
             const sErrors = config.shuffle ? shuffleArray(errorCards) : errorCards;
             const sNew = config.shuffle ? shuffleArray(newCards) : newCards;
             const sReview = config.shuffle ? shuffleArray(reviewCards) : reviewCards;
@@ -729,7 +732,6 @@
             if (isEditingFromStudy) { 
                 const qIdx = studyQueue.findIndex(c => String(c.id) === String(editingCardId)); 
                 if (qIdx !== -1) studyQueue[qIdx] = {...card}; 
-                // NÃO limpamos isFlipped para que o usuário continue no verso se já estava lá
                 render(); 
             } else { 
                 showManageCardsModal = true; 
@@ -846,8 +848,6 @@
             });
             
             saveDecks();
-            // Ao adicionar um card durante o estudo, ele vai para o final da fila se refresh for chamado.
-            // Aqui optamos por não dar refresh total para não perder o card atual que está sendo estudado.
             cardAddedFeedback = true;
             clearTempDraft();
             render();
