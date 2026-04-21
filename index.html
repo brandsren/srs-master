@@ -98,7 +98,7 @@
         let searchTerm = '';
         let showOnlyErrors = false;
 
-        let tempDraft = { f: '', b: '', ex: '', hint: '', imgF: '', imgB: '' };
+        let tempDraft = { f: '', b: '', ex: '', hint: '', imgF: '', imgB: '', initialized: false };
         let previewFlipped = false;
         let previewShowHint = false;
         window.tempPreviewCard = null;
@@ -577,8 +577,13 @@
             clearTempDraft();
             const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             const card = decks[dIdx].cards.find(c => String(c.id) === String(editingCardId));
+            tempDraft.f = card.f;
+            tempDraft.b = card.b || '';
+            tempDraft.ex = card.ex || '';
+            tempDraft.hint = card.hint || '';
             tempDraft.imgF = card.imgF || '';
             tempDraft.imgB = card.imgB || '';
+            tempDraft.initialized = true;
             showEditCardModal = true; showManageCardsModal = false; render(); 
         }
 
@@ -587,10 +592,11 @@
             const card = decks[dIdx].cards.find(c => String(c.id) === String(editingCardId));
             if (!card) return '';
 
-            const fValue = tempDraft.f || card.f;
-            const bValue = card.type !== 'cloze' ? (tempDraft.b || card.b) : '';
-            const exValue = card.type === 'complete' ? (tempDraft.ex || card.ex) : '';
-            const hintValue = card.type === 'cloze' ? (tempDraft.hint || card.hint) : '';
+            // Usamos tempDraft como fonte de verdade para persistir os dados enquanto o modal está aberto (mesmo se o preview abrir/fechar)
+            const fValue = tempDraft.f;
+            const bValue = tempDraft.b;
+            const exValue = tempDraft.ex;
+            const hintValue = tempDraft.hint;
 
             return `
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-6">
@@ -626,7 +632,7 @@
                                         <button onclick="tempDraft.imgF=''; render();" class="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1"><i data-lucide="x" class="w-3 h-3"></i></button>
                                     </div>
                                 ` : ''}
-                                <textarea id="editF" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-28 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${fValue}</textarea>
+                                <textarea id="editF" oninput="tempDraft.f=this.value" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-28 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${fValue}</textarea>
                             </div>
 
                             <!-- VERSO EDIT -->
@@ -647,12 +653,12 @@
                                             <button onclick="tempDraft.imgB=''; render();" class="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1"><i data-lucide="x" class="w-3 h-3"></i></button>
                                         </div>
                                     ` : ''}
-                                    <textarea id="editB" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${bValue}</textarea>
+                                    <textarea id="editB" oninput="tempDraft.b=this.value" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${bValue}</textarea>
                                 </div>
                             ` : ''}
                             
-                            ${card.type === 'complete' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Exemplo</p><textarea id="editEx" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed italic">${exValue}</textarea></div>` : ''}
-                            ${card.type === 'cloze' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Dica</p><input id="editHint" value="${hintValue}" class="w-full bg-slate-50 border-0 rounded-3xl p-5 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"></div>` : ''}
+                            ${card.type === 'complete' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Exemplo</p><textarea id="editEx" oninput="tempDraft.ex=this.value" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed italic">${exValue}</textarea></div>` : ''}
+                            ${card.type === 'cloze' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Dica</p><input id="editHint" oninput="tempDraft.hint=this.value" value="${hintValue}" class="w-full bg-slate-50 border-0 rounded-3xl p-5 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"></div>` : ''}
                             <div class="grid grid-cols-2 gap-3 pt-4"><button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; clearTempDraft(); render();" class="bg-slate-100 text-slate-500 py-4 rounded-3xl font-bold active:scale-95 transition-transform">Cancelar</button><button onclick="saveEditedCard()" class="bg-indigo-600 text-white py-4 rounded-3xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all">Salvar</button></div>
                         </div>
                     </div>
@@ -661,7 +667,7 @@
         }
 
         function clearTempDraft() {
-            tempDraft = { f: '', b: '', ex: '', hint: '', imgF: '', imgB: '' };
+            tempDraft = { f: '', b: '', ex: '', hint: '', imgF: '', imgB: '', initialized: false };
         }
 
         function openCardPreview(source) {
@@ -670,10 +676,19 @@
                 const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
                 const card = decks[dIdx].cards.find(c => String(c.id) === String(editingCardId));
                 type = card.type;
+                
+                // Capturamos os valores atuais do DOM para atualizar o rascunho ANTES do preview
                 f = document.getElementById('editF').value;
                 b = document.getElementById('editB') ? document.getElementById('editB').value : '';
                 ex = document.getElementById('editEx') ? document.getElementById('editEx').value : '';
                 hint = document.getElementById('editHint') ? document.getElementById('editHint').value : '';
+                
+                // Atualiza tempDraft para que ao fechar o preview o modal de edição tenha os dados novos
+                tempDraft.f = f;
+                tempDraft.b = b;
+                tempDraft.ex = ex;
+                tempDraft.hint = hint;
+                
                 imgF = tempDraft.imgF;
                 imgB = tempDraft.imgB;
             } else {
@@ -684,6 +699,12 @@
                 hint = document.getElementById('newHint') ? document.getElementById('newHint').value : "";
                 imgF = tempDraft.imgF;
                 imgB = tempDraft.imgB;
+                
+                // Salva também para o caso de adição simples
+                tempDraft.f = f;
+                tempDraft.b = b;
+                tempDraft.ex = ex;
+                tempDraft.hint = hint;
             }
             window.tempPreviewCard = { type, f, b, ex, hint, imgF, imgB };
             previewFlipped = false; previewShowHint = false; showPreviewModal = true; render();
@@ -754,11 +775,14 @@
             const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             const cIdx = decks[dIdx].cards.findIndex(c => String(c.id) === String(editingCardId));
             const card = decks[dIdx].cards[cIdx];
-            card.f = document.getElementById('editF').value.trim();
-            if (card.type !== 'cloze') card.b = document.getElementById('editB').value.trim();
-            if (card.type === 'complete') card.ex = document.getElementById('editEx').value.trim();
-            if (card.type === 'cloze') card.hint = document.getElementById('editHint').value.trim();
+            
+            // Pega direto do rascunho atualizado pelos oninput
+            card.f = tempDraft.f.trim();
+            if (card.type !== 'cloze') card.b = tempDraft.b.trim();
+            if (card.type === 'complete') card.ex = tempDraft.ex.trim();
+            if (card.type === 'cloze') card.hint = tempDraft.hint.trim();
             if (card.type === 'basic') { card.imgF = tempDraft.imgF; card.imgB = tempDraft.imgB; }
+            
             saveDecks(); showEditCardModal = false; 
             if (isEditingFromStudy) { 
                 const qIdx = studyQueue.findIndex(c => String(c.id) === String(editingCardId)); 
@@ -833,7 +857,7 @@
                                         ${cardSubtype==='basic' ? `<label class="cursor-pointer bg-slate-50 text-slate-400 p-2 rounded-xl active:scale-90 transition-all"><i data-lucide="camera" class="w-4 h-4"></i><input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(this, 'imgF')"></label>` : ''}
                                     </div>
                                     ${tempDraft.imgF ? `<div class="relative inline-block mb-2"><img src="${tempDraft.imgF}" class="h-16 w-auto rounded-xl object-cover shadow-sm"><button onclick="tempDraft.imgF=''; render();" class="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1"><i data-lucide="x" class="w-2 h-2"></i></button></div>` : ''}
-                                    <textarea id="newF" placeholder="${cardSubtype === 'cloze' ? 'Frase com [termo]' : 'Frente'}" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-24 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">${tempDraft.f}</textarea>
+                                    <textarea id="newF" oninput="tempDraft.f=this.value" placeholder="${cardSubtype === 'cloze' ? 'Frase com [termo]' : 'Frente'}" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-24 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">${tempDraft.f}</textarea>
                                 </div>
                                 <!-- BACK INPUT -->
                                 ${cardSubtype !== 'cloze' ? `
@@ -843,11 +867,11 @@
                                             ${cardSubtype==='basic' ? `<label class="cursor-pointer bg-slate-50 text-slate-400 p-2 rounded-xl active:scale-90 transition-all"><i data-lucide="camera" class="w-4 h-4"></i><input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(this, 'imgB')"></label>` : ''}
                                         </div>
                                         ${tempDraft.imgB ? `<div class="relative inline-block mb-2"><img src="${tempDraft.imgB}" class="h-16 w-auto rounded-xl object-cover shadow-sm"><button onclick="tempDraft.imgB=''; render();" class="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1"><i data-lucide="x" class="w-2 h-2"></i></button></div>` : ''}
-                                        <textarea id="newB" placeholder="Verso" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">${tempDraft.b}</textarea>
+                                        <textarea id="newB" oninput="tempDraft.b=this.value" placeholder="Verso" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">${tempDraft.b}</textarea>
                                     </div>
                                 ` : ''}
-                                ${cardSubtype === 'complete' ? `<textarea id="newEx" placeholder="Exemplo" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm italic">${tempDraft.ex}</textarea>` : ''}
-                                ${cardSubtype === 'cloze' ? `<input id="newHint" placeholder="Dica" value="${tempDraft.hint}" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 focus:ring-2 focus:ring-indigo-500 outline-none text-sm">` : ''}
+                                ${cardSubtype === 'complete' ? `<textarea id="newEx" oninput="tempDraft.ex=this.value" placeholder="Exemplo" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm italic">${tempDraft.ex}</textarea>` : ''}
+                                ${cardSubtype === 'cloze' ? `<input id="newHint" oninput="tempDraft.hint=this.value" placeholder="Dica" value="${tempDraft.hint}" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 focus:ring-2 focus:ring-indigo-500 outline-none text-sm">` : ''}
                                 <button onclick="saveSingleCard()" class="w-full bg-indigo-600 text-white py-5 rounded-[2rem] font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all mt-4">Adicionar Card</button>
                             </div>
                         ` : `
@@ -860,23 +884,27 @@
         }
 
         function saveSingleCard() {
-            const fInput = document.getElementById('newF');
-            const f = fInput.value.trim();
+            const f = tempDraft.f.trim();
             if (!f) return;
             const idx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             decks[idx].cards.push({ 
                 id: Date.now() + Math.random(), 
                 type: cardSubtype, f, 
-                b: cardSubtype === 'cloze' ? '' : document.getElementById('newB').value.trim(), 
-                ex: cardSubtype === 'complete' ? document.getElementById('newEx').value.trim() : '', 
-                hint: cardSubtype === 'cloze' ? (document.getElementById('newHint') ? document.getElementById('newHint').value.trim() : '') : '', 
+                b: cardSubtype === 'cloze' ? '' : tempDraft.b.trim(), 
+                ex: cardSubtype === 'complete' ? tempDraft.ex.trim() : '', 
+                hint: cardSubtype === 'cloze' ? tempDraft.hint.trim() : '', 
                 imgF: tempDraft.imgF, imgB: tempDraft.imgB,
                 interval: 0, repetition: 0, efactor: 2.5, lapses: 0, dueDate: new Date().toISOString(), wasViewed: false 
             });
-            saveDecks(); cardAddedFeedback = true; clearTempDraft(); render();
+            saveDecks(); cardAddedFeedback = true; 
+            
+            // Limpa o texto mas mantém o rascunho de imagens caso queira adicionar outro parecido
+            tempDraft.f = ''; tempDraft.b = ''; tempDraft.ex = ''; tempDraft.hint = '';
+            render();
+            
             setTimeout(() => {
                 const fNew = document.getElementById('newF');
-                if(fNew) { fNew.value = ''; if(document.getElementById('newB')) document.getElementById('newB').value = ''; fNew.focus(); }
+                if(fNew) fNew.focus();
             }, 50);
             setTimeout(() => { cardAddedFeedback = false; if(showAddCardModal) render(); }, 2000);
         }
