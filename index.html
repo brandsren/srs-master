@@ -79,6 +79,9 @@
         let isFlipped = false;
         let showHint = false;
         
+        // Histórico para Desfazer
+        let lastAction = null; 
+
         let showAddDeckModal = false;
         let showRenameDeckModal = false;
         let showAddCardModal = false;
@@ -158,6 +161,7 @@
             } else {
                 studyQueue = [...sErrors, ...sReview, ...sNew];
             }
+            lastAction = null; // Limpa o undo ao trocar de deck ou resetar fila
         };
 
         function speak(text, callback) {
@@ -212,6 +216,33 @@
             deck[key] = deck[key] === undefined ? false : !deck[key];
             saveDecks();
             render();
+        }
+
+        function undoLastRate() {
+            if (!lastAction) return;
+            const { cardId, oldState } = lastAction;
+            const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
+            if (dIdx === -1) return;
+            
+            const cIdx = decks[dIdx].cards.findIndex(c => String(c.id) === String(cardId));
+            if (cIdx === -1) return;
+
+            // Restaura o estado no deck
+            decks[dIdx].cards[cIdx] = { ...oldState };
+            
+            // Coloca o card de volta no topo da fila
+            studyQueue.unshift({ ...oldState });
+            
+            lastAction = null;
+            saveDecks();
+            isFlipped = false;
+            showHint = false;
+            render();
+            
+            const deck = decks[dIdx];
+            if (deck.autoFront !== undefined ? deck.autoFront : true) {
+                speak(studyQueue[0].f);
+            }
         }
 
         function render() {
@@ -360,6 +391,10 @@
                         <i data-lucide="arrow-left" class="w-4 h-4 text-indigo-500"></i> Home
                     </button>
                     <div class="flex gap-2">
+                        <!-- Botão Desfazer (Undo) -->
+                        <button onclick="undoLastRate()" class="bg-white p-2 rounded-xl border border-slate-100 shadow-sm active:scale-95 transition-all ${!lastAction ? 'opacity-30 grayscale cursor-not-allowed' : 'text-slate-600'}">
+                            <i data-lucide="undo-2" class="w-5 h-5"></i>
+                        </button>
                         <button onclick="showStudyConfigModal=true; render();" class="bg-white text-slate-600 p-2 rounded-xl border border-slate-100 shadow-sm active:scale-95 transition-all"><i data-lucide="sliders-horizontal" class="w-5 h-5"></i></button>
                         <button onclick="showManageCardsModal=true; searchTerm=''; showOnlyErrors=false; render();" class="bg-white text-slate-600 p-2 rounded-xl border border-slate-100 shadow-sm active:scale-95 transition-all"><i data-lucide="list" class="w-5 h-5"></i></button>
                         <button onclick="showAddCardModal=true; cardAddedFeedback=false; clearTempDraft(); render();" class="bg-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-100 active:scale-95 transition-all"><i data-lucide="plus" class="w-5 h-5"></i></button>
@@ -459,6 +494,13 @@
             const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             const cIdx = decks[dIdx].cards.findIndex(c => String(c.id) === String(currentCard.id));
             let card = decks[dIdx].cards[cIdx];
+            
+            // Grava o estado anterior para Undo
+            lastAction = {
+                cardId: card.id,
+                oldState: JSON.parse(JSON.stringify(card))
+            };
+
             card.wasViewed = true;
 
             if (q >= 2) { 
@@ -592,7 +634,6 @@
             const card = decks[dIdx].cards.find(c => String(c.id) === String(editingCardId));
             if (!card) return '';
 
-            // Usamos tempDraft como fonte de verdade para persistir os dados enquanto o modal está aberto (mesmo se o preview abrir/fechar)
             const fValue = tempDraft.f;
             const bValue = tempDraft.b;
             const exValue = tempDraft.ex;
@@ -614,8 +655,6 @@
                                 <div><p class="text-[9px] font-black text-amber-600 uppercase mb-1 tracking-widest">Estado</p><p class="text-[11px] font-bold text-amber-800">${isNewCard(card) ? 'Novo' : 'Aprendizado'}</p></div>
                                 ${!isNewCard(card) ? `<button onclick="showConfirmResetModal=true; render();" class="text-[9px] font-black text-white bg-amber-500 px-4 py-2.5 rounded-2xl uppercase active:scale-95 transition-all">Resetar</button>` : ''}
                             </div>
-
-                            <!-- FRENTE EDIT -->
                             <div>
                                 <div class="flex justify-between items-end mb-2 ml-1">
                                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Frente</p>
@@ -634,8 +673,6 @@
                                 ` : ''}
                                 <textarea id="editF" oninput="tempDraft.f=this.value" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-28 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${fValue}</textarea>
                             </div>
-
-                            <!-- VERSO EDIT -->
                             ${card.type !== 'cloze' ? `
                                 <div>
                                     <div class="flex justify-between items-end mb-2 ml-1">
@@ -656,7 +693,6 @@
                                     <textarea id="editB" oninput="tempDraft.b=this.value" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${bValue}</textarea>
                                 </div>
                             ` : ''}
-                            
                             ${card.type === 'complete' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Exemplo</p><textarea id="editEx" oninput="tempDraft.ex=this.value" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed italic">${exValue}</textarea></div>` : ''}
                             ${card.type === 'cloze' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Dica</p><input id="editHint" oninput="tempDraft.hint=this.value" value="${hintValue}" class="w-full bg-slate-50 border-0 rounded-3xl p-5 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"></div>` : ''}
                             <div class="grid grid-cols-2 gap-3 pt-4"><button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; clearTempDraft(); render();" class="bg-slate-100 text-slate-500 py-4 rounded-3xl font-bold active:scale-95 transition-transform">Cancelar</button><button onclick="saveEditedCard()" class="bg-indigo-600 text-white py-4 rounded-3xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all">Salvar</button></div>
@@ -676,35 +712,20 @@
                 const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
                 const card = decks[dIdx].cards.find(c => String(c.id) === String(editingCardId));
                 type = card.type;
-                
-                // Capturamos os valores atuais do DOM para atualizar o rascunho ANTES do preview
                 f = document.getElementById('editF').value;
                 b = document.getElementById('editB') ? document.getElementById('editB').value : '';
                 ex = document.getElementById('editEx') ? document.getElementById('editEx').value : '';
                 hint = document.getElementById('editHint') ? document.getElementById('editHint').value : '';
-                
-                // Atualiza tempDraft para que ao fechar o preview o modal de edição tenha os dados novos
-                tempDraft.f = f;
-                tempDraft.b = b;
-                tempDraft.ex = ex;
-                tempDraft.hint = hint;
-                
-                imgF = tempDraft.imgF;
-                imgB = tempDraft.imgB;
+                tempDraft.f = f; tempDraft.b = b; tempDraft.ex = ex; tempDraft.hint = hint;
+                imgF = tempDraft.imgF; imgB = tempDraft.imgB;
             } else {
                 type = cardSubtype;
                 f = document.getElementById('newF').value;
                 b = document.getElementById('newB') ? document.getElementById('newB').value : "";
                 ex = document.getElementById('newEx') ? document.getElementById('newEx').value : "";
                 hint = document.getElementById('newHint') ? document.getElementById('newHint').value : "";
-                imgF = tempDraft.imgF;
-                imgB = tempDraft.imgB;
-                
-                // Salva também para o caso de adição simples
-                tempDraft.f = f;
-                tempDraft.b = b;
-                tempDraft.ex = ex;
-                tempDraft.hint = hint;
+                imgF = tempDraft.imgF; imgB = tempDraft.imgB;
+                tempDraft.f = f; tempDraft.b = b; tempDraft.ex = ex; tempDraft.hint = hint;
             }
             window.tempPreviewCard = { type, f, b, ex, hint, imgF, imgB };
             previewFlipped = false; previewShowHint = false; showPreviewModal = true; render();
@@ -720,13 +741,11 @@
                     </div>
                     <div class="relative h-[440px] w-full max-sm perspective-1000">
                         <div class="relative w-full h-full preserve-3d ${previewFlipped ? 'rotate-y-180' : ''}" onclick="previewFlipped = !previewFlipped; render(); if(previewFlipped) speak(window.tempPreviewCard.type === 'cloze' ? window.tempPreviewCard.f : window.tempPreviewCard.b);">
-                            <!-- FRENTE PREVIEW -->
                             <div class="absolute inset-0 backface-hidden bg-white rounded-[40px] shadow-2xl flex flex-col items-center justify-center p-8 text-center">
                                 ${card.imgF ? `<img src="${card.imgF}" class="max-h-40 rounded-2xl mb-4 shadow-sm">` : ''}
                                 <div class="text-2xl font-bold text-slate-800 leading-tight">${formatCardText(card.f, false)}</div>
                                 ${card.type === 'cloze' && card.hint ? `<div class="mt-4 text-[11px] font-bold text-indigo-500">Dica: ${card.hint}</div>` : ''}
                             </div>
-                            <!-- VERSO PREVIEW -->
                             <div class="absolute inset-0 backface-hidden bg-indigo-600 rounded-[40px] shadow-2xl flex flex-col items-center justify-center p-8 text-center rotate-y-180">
                                 ${card.imgB ? `<img src="${card.imgB}" class="max-h-40 rounded-2xl mb-4 border border-white/20">` : ''}
                                 <div class="text-2xl font-bold text-white mb-4">${card.type === 'cloze' ? formatCardText(card.f, true) : formatCardText(card.b, true)}</div>
@@ -775,14 +794,11 @@
             const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             const cIdx = decks[dIdx].cards.findIndex(c => String(c.id) === String(editingCardId));
             const card = decks[dIdx].cards[cIdx];
-            
-            // Pega direto do rascunho atualizado pelos oninput
             card.f = tempDraft.f.trim();
             if (card.type !== 'cloze') card.b = tempDraft.b.trim();
             if (card.type === 'complete') card.ex = tempDraft.ex.trim();
             if (card.type === 'cloze') card.hint = tempDraft.hint.trim();
             if (card.type === 'basic') { card.imgF = tempDraft.imgF; card.imgB = tempDraft.imgB; }
-            
             saveDecks(); showEditCardModal = false; 
             if (isEditingFromStudy) { 
                 const qIdx = studyQueue.findIndex(c => String(c.id) === String(editingCardId)); 
@@ -840,9 +856,7 @@
                             <button onclick="addMode='single'; render();" class="flex-1 py-4 rounded-[1.25rem] transition-all ${addMode==='single'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Individual</button>
                             <button onclick="addMode='bulk'; render();" class="flex-1 py-4 rounded-[1.25rem] transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Importar</button>
                         </div>
-
                         ${cardAddedFeedback ? `<div class="bg-emerald-50 text-emerald-600 text-[10px] font-bold py-3 px-4 rounded-2xl mb-4 text-center animate-pulse flex items-center justify-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Card Adicionado!</div>` : ''}
-
                         ${addMode === 'single' ? `
                             <div class="grid grid-cols-3 gap-2 mb-8">
                                 <button onclick="cardSubtype='basic'; render();" class="text-[8px] font-black uppercase py-4 border-2 rounded-2xl transition-all ${cardSubtype==='basic'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-50 text-slate-400'}">Card 1</button>
@@ -850,7 +864,6 @@
                                 <button onclick="cardSubtype='cloze' ; render();" class="text-[8px] font-black uppercase py-4 border-2 rounded-2xl transition-all ${cardSubtype==='cloze'?'bg-indigo-50 border-indigo-200 text-indigo-600':'border-slate-50 text-slate-400'}">Lacuna</button>
                             </div>
                             <div class="space-y-4">
-                                <!-- FRONT INPUT -->
                                 <div>
                                     <div class="flex justify-between items-end mb-2 px-1">
                                         <span class="text-[9px] font-black uppercase text-slate-400 tracking-widest">Frente</span>
@@ -859,7 +872,6 @@
                                     ${tempDraft.imgF ? `<div class="relative inline-block mb-2"><img src="${tempDraft.imgF}" class="h-16 w-auto rounded-xl object-cover shadow-sm"><button onclick="tempDraft.imgF=''; render();" class="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1"><i data-lucide="x" class="w-2 h-2"></i></button></div>` : ''}
                                     <textarea id="newF" oninput="tempDraft.f=this.value" placeholder="${cardSubtype === 'cloze' ? 'Frase com [termo]' : 'Frente'}" class="w-full bg-slate-50 border-0 rounded-[2rem] p-6 h-24 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all">${tempDraft.f}</textarea>
                                 </div>
-                                <!-- BACK INPUT -->
                                 ${cardSubtype !== 'cloze' ? `
                                     <div>
                                         <div class="flex justify-between items-end mb-2 px-1">
@@ -897,11 +909,8 @@
                 interval: 0, repetition: 0, efactor: 2.5, lapses: 0, dueDate: new Date().toISOString(), wasViewed: false 
             });
             saveDecks(); cardAddedFeedback = true; 
-            
-            // Limpa o texto mas mantém o rascunho de imagens caso queira adicionar outro parecido
             tempDraft.f = ''; tempDraft.b = ''; tempDraft.ex = ''; tempDraft.hint = '';
             render();
-            
             setTimeout(() => {
                 const fNew = document.getElementById('newF');
                 if(fNew) fNew.focus();
