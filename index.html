@@ -64,31 +64,17 @@
             animation: pulse-red 2s infinite;
         }
 
+        /* Melhoria para imagens e gifs */
         .card-image {
             max-width: 100%;
-            max-height: 250px;
+            height: auto;
             border-radius: 1rem;
             object-fit: contain;
-        }
-
-        .error-toast {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #ef4444;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 16px;
-            font-weight: bold;
-            z-index: 9999;
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
         }
     </style>
 </head>
 <body class="text-slate-900 font-sans">
     <div id="root" class="max-w-md mx-auto p-4"></div>
-    <div id="toast-container"></div>
 
     <script>
         // --- Estado Global ---
@@ -126,39 +112,18 @@
         let previewShowHint = false;
         window.tempPreviewCard = null;
 
-        // --- Persistência e Utilitários ---
+        // --- Persistência ---
         const loadDecks = () => {
-            try {
-                decks = JSON.parse(localStorage.getItem('srs_v22_decks') || '[]');
-            } catch(e) {
-                showToast("Erro ao carregar dados.");
-                decks = [];
-            }
+            decks = JSON.parse(localStorage.getItem('srs_v22_decks') || '[]');
         };
 
         const saveDecks = () => {
-            try {
-                localStorage.setItem('srs_v22_decks', JSON.stringify(decks));
-                return true;
-            } catch (e) {
-                console.error("Storage Error:", e);
-                showToast("Memória cheia! Tente GIFs menores ou remova imagens.");
-                return false;
-            }
+            localStorage.setItem('srs_v22_decks', JSON.stringify(decks));
         };
 
         const saveConfig = () => {
             localStorage.setItem('srs_config_v22', JSON.stringify(config));
         };
-
-        function showToast(msg) {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = 'error-toast modal-enter';
-            toast.innerText = msg;
-            container.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
-        }
         
         const getStartOfToday = () => {
             const now = new Date();
@@ -258,51 +223,16 @@
             return html;
         }
 
-        // Função otimizada para lidar com imagens e GIFs
-        async function handleImageUpload(input, type) {
+        // Função corrigida para lidar com GIFs e imagens pesadas
+        function handleImageUpload(input, type) {
             const file = input.files[0];
             if (!file) return;
 
-            // Se for GIF, apenas checamos o tamanho (pois compressão de GIF em JS é complexa)
-            if (file.type === 'image/gif') {
-                if (file.size > 800 * 1024) { // 800KB limite para GIFs
-                    showToast("GIF muito grande! Tente um abaixo de 800KB.");
-                    input.value = "";
-                    return;
-                }
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    tempDraft[type] = e.target.result;
-                    render();
-                };
-                reader.readAsDataURL(file);
-                return;
-            }
-
-            // Se for imagem estática (PNG/JPG), redimensionamos para economizar espaço
             const reader = new FileReader();
             reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-                    const max = 500; // Resolução máx para economizar localStorage
-
-                    if (width > height) {
-                        if (width > max) { height *= max / width; width = max; }
-                    } else {
-                        if (height > max) { width *= max / height; height = max; }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    tempDraft[type] = canvas.toDataURL('image/jpeg', 0.7); // 70% qualidade jpeg
-                    render();
-                };
-                img.src = e.target.result;
+                tempDraft[type] = e.target.result;
+                // Força renderização para mostrar o preview imediatamente
+                render();
             };
             reader.readAsDataURL(file);
         }
@@ -631,21 +561,10 @@
 
         function createNewDeck() {
             const name = document.getElementById('deckNameInput').value.trim();
-            if (name) { 
-                decks.push({ id: Date.now(), name, cards: [], autoFront: true, autoBack: true }); 
-                if(saveDecks()) {
-                    showAddDeckModal = false; 
-                    render(); 
-                }
-            }
+            if (name) { decks.push({ id: Date.now(), name, cards: [], autoFront: true, autoBack: true }); saveDecks(); showAddDeckModal = false; render(); }
         }
 
-        function deleteDeck(id) { 
-            decks = decks.filter(d => String(d.id) !== String(id)); 
-            saveDecks(); 
-            showRenameDeckModal = false; 
-            render(); 
-        }
+        function deleteDeck(id) { decks = decks.filter(d => String(d.id) !== String(id)); saveDecks(); showRenameDeckModal = false; render(); }
 
         function normalizeString(str) {
             return (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -820,10 +739,18 @@
         function openCardPreview(source) {
             let f, b, ex, hint, type, imgF, imgB, imgHint;
             if (source === 'edit') {
-                type = tempDraft.type; f = tempDraft.f; b = tempDraft.b || ''; ex = tempDraft.ex || ''; hint = tempDraft.hint || '';
+                type = tempDraft.type;
+                f = tempDraft.f;
+                b = tempDraft.b || '';
+                ex = tempDraft.ex || '';
+                hint = tempDraft.hint || '';
                 imgF = tempDraft.imgF; imgB = tempDraft.imgB; imgHint = tempDraft.imgHint;
             } else {
-                type = cardSubtype; f = tempDraft.f; b = tempDraft.b || ""; ex = tempDraft.ex || ""; hint = tempDraft.hint || "";
+                type = cardSubtype;
+                f = tempDraft.f;
+                b = tempDraft.b || "";
+                ex = tempDraft.ex || "";
+                hint = tempDraft.hint || "";
                 imgF = tempDraft.imgF; imgB = tempDraft.imgB; imgHint = tempDraft.imgHint;
             }
             window.tempPreviewCard = { type, f, b, ex, hint, imgF, imgB, imgHint };
@@ -884,14 +811,12 @@
                 const card = decks[dIdx].cards[cIdx];
                 card.interval = 0; card.repetition = 0; card.efactor = 2.5; card.lapses = 0;
                 card.dueDate = new Date().toISOString(); card.wasViewed = false;
-                if(saveDecks()) {
-                    showConfirmResetModal = false;
-                    if (isEditingFromStudy) {
-                        const qIdx = studyQueue.findIndex(c => String(c.id) === String(editingCardId));
-                        if (qIdx !== -1) studyQueue[qIdx] = {...card};
-                    }
-                    clearTempDraft(); render();
+                saveDecks(); showConfirmResetModal = false;
+                if (isEditingFromStudy) {
+                    const qIdx = studyQueue.findIndex(c => String(c.id) === String(editingCardId));
+                    if (qIdx !== -1) studyQueue[qIdx] = {...card};
                 }
+                clearTempDraft(); render();
             }
         }
 
@@ -902,7 +827,6 @@
             
             if (!tempDraft.f.trim() && !tempDraft.imgF) return;
 
-            const oldCard = JSON.parse(JSON.stringify(card));
             card.type = tempDraft.type;
             card.f = tempDraft.f.trim();
             card.b = tempDraft.type !== 'cloze' ? tempDraft.b.trim() : '';
@@ -912,39 +836,30 @@
             card.imgB = tempDraft.imgB; 
             card.imgHint = tempDraft.imgHint;
             
-            if (saveDecks()) {
-                showEditCardModal = false; 
-                if (isEditingFromStudy) { 
-                    const qIdx = studyQueue.findIndex(c => String(c.id) === String(editingCardId)); 
-                    if (qIdx !== -1) studyQueue[qIdx] = {...card}; 
-                    render(); 
-                } else { 
-                    showManageCardsModal = true; render(); 
-                }
-                clearTempDraft();
-            } else {
-                decks[dIdx].cards[cIdx] = oldCard; // Reverte se falhar
+            saveDecks(); showEditCardModal = false; 
+            if (isEditingFromStudy) { 
+                const qIdx = studyQueue.findIndex(c => String(c.id) === String(editingCardId)); 
+                if (qIdx !== -1) studyQueue[qIdx] = {...card}; 
+                render(); 
+            } else { 
+                showManageCardsModal = true; render(); 
             }
+            clearTempDraft();
         }
 
         function deleteCard(id, fromEditor = false) {
             if(!confirm('Excluir permanentemente?')) return;
             const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             if (dIdx === -1) return;
-            const oldCards = [...decks[dIdx].cards];
             decks[dIdx].cards = decks[dIdx].cards.filter(c => String(c.id) !== String(id));
-            
-            if (saveDecks()) {
-                studyQueue = studyQueue.filter(c => String(c.id) !== String(id));
-                isFlipped = false; showHint = false;
-                if (fromEditor) { showEditCardModal = false; clearTempDraft(); if (!isEditingFromStudy) showManageCardsModal = true; }
-                render();
-                if (studyQueue.length > 0 && view === 'study') {
-                    const deck = getCurrentDeck();
-                    if (deck.autoFront !== undefined ? deck.autoFront : true) setTimeout(() => speak(studyQueue[0].f), 300);
-                }
-            } else {
-                decks[dIdx].cards = oldCards; // Reverte
+            saveDecks(); 
+            studyQueue = studyQueue.filter(c => String(c.id) !== String(id));
+            isFlipped = false; showHint = false;
+            if (fromEditor) { showEditCardModal = false; clearTempDraft(); if (!isEditingFromStudy) showManageCardsModal = true; }
+            render();
+            if (studyQueue.length > 0 && view === 'study') {
+                const deck = getCurrentDeck();
+                if (deck.autoFront !== undefined ? deck.autoFront : true) setTimeout(() => speak(studyQueue[0].f), 300);
             }
         }
 
@@ -1054,37 +969,33 @@
             };
             
             decks[idx].cards.push(newCard);
+            saveDecks(); 
             
-            if (saveDecks()) {
-                if (view === 'study') {
-                    studyQueue.push({ ...newCard });
-                } else {
-                    refreshStudyQueue(true);
-                }
-
-                const fb = document.getElementById('feedbackBox');
-                if(fb) {
-                    fb.classList.remove('hidden');
-                    fb.classList.add('animate-pulse');
-                    setTimeout(() => { if(fb) { fb.classList.add('hidden'); fb.classList.remove('animate-pulse'); } }, 2000);
-                }
-
-                tempDraft.f = ''; tempDraft.b = ''; tempDraft.ex = ''; tempDraft.hint = '';
-                tempDraft.imgF = ''; tempDraft.imgB = ''; tempDraft.imgHint = '';
-                const inputs = ['newF', 'newB', 'newEx', 'newHint'];
-                inputs.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-
-                render();
+            if (view === 'study') {
+                studyQueue.push({ ...newCard });
             } else {
-                decks[idx].cards.pop(); // Remove o card se o salvamento falhar (memória cheia)
+                refreshStudyQueue(true);
             }
+
+            const fb = document.getElementById('feedbackBox');
+            if(fb) {
+                fb.classList.remove('hidden');
+                fb.classList.add('animate-pulse');
+                setTimeout(() => { if(fb) { fb.classList.add('hidden'); fb.classList.remove('animate-pulse'); } }, 2000);
+            }
+
+            tempDraft.f = ''; tempDraft.b = ''; tempDraft.ex = ''; tempDraft.hint = '';
+            tempDraft.imgF = ''; tempDraft.imgB = ''; tempDraft.imgHint = '';
+            const inputs = ['newF', 'newB', 'newEx', 'newHint'];
+            inputs.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+
+            render();
         }
 
         function saveBulkCards() {
             const data = document.getElementById('bulkData').value.trim();
             if(!data) return;
             const idx = decks.findIndex(d => String(d.id) === String(currentDeckId));
-            const oldCards = [...decks[idx].cards];
             
             const newCardsCreated = [];
             data.split('\n').filter(l => l.includes(';')).forEach((line, i) => {
@@ -1107,13 +1018,10 @@
                 }
             });
             
-            if (saveDecks()) {
-                if (view === 'study') studyQueue.push(...newCardsCreated);
-                else refreshStudyQueue(true); 
-                showAddCardModal = false; render();
-            } else {
-                decks[idx].cards = oldCards; // Reverte se falhar
-            }
+            saveDecks(); 
+            if (view === 'study') studyQueue.push(...newCardsCreated);
+            else refreshStudyQueue(true); 
+            showAddCardModal = false; render();
         }
 
         loadDecks();
