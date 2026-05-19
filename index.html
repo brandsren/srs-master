@@ -251,6 +251,7 @@
             render();
         }
 
+        // Desfazer última nota
         function undoLastRate() {
             if (!lastAction) return;
             const { cardId, oldState } = lastAction;
@@ -570,7 +571,6 @@
             if (name) { decks.push({ id: Date.now(), name, cards: [], autoFront: true, autoBack: true }); saveDecks(); showAddDeckModal = false; render(); }
         }
 
-        // Deletar deck
         function deleteDeck(id) { decks = decks.filter(d => String(d.id) !== String(id)); saveDecks(); showRenameDeckModal = false; render(); }
 
         function normalizeString(str) {
@@ -665,74 +665,94 @@
             showEditCardModal = true; showManageCardsModal = false; render(); 
         }
 
+        // ALTERAÇÃO: Modal de Ajustar Card redesenhado com cabeçalho e rodapé fixos, e área central rolável.
         function renderEditCardModal() {
             const dIdx = decks.findIndex(d => String(d.id) === String(currentDeckId));
             const card = decks[dIdx].cards.find(c => String(c.id) === String(editingCardId));
             if (!card) return '';
 
             return `
-                <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-6">
-                    <div class="bg-white rounded-t-[40px] sm:rounded-[40px] p-8 w-full max-sm overflow-y-auto max-h-[95vh] modal-enter relative shadow-2xl">
-                        <div class="flex justify-between items-center mb-8">
-                            <h2 class="text-xl font-black text-slate-800 uppercase">Ajustar Card</h2>
-                            <div class="flex items-center gap-3">
-                                <button onclick="openCardPreview('edit')" class="bg-indigo-50 text-indigo-600 p-3 rounded-2xl active:scale-90 transition-transform"><i data-lucide="eye" class="w-5 h-5"></i></button>
-                                <button onclick="deleteCard('${card.id}', true)" class="bg-rose-50 text-rose-500 p-3 rounded-2xl active:scale-90 transition-transform"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
-                                <button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; clearTempDraft(); render();" class="bg-slate-50 p-2 rounded-xl text-slate-300"><i data-lucide="x" class="w-6 h-6"></i></button>
+                <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                    <div class="bg-white rounded-t-[32px] sm:rounded-[32px] p-6 w-full max-w-sm h-[85vh] sm:h-auto sm:max-h-[90vh] flex flex-col modal-enter relative shadow-2xl overflow-hidden">
+                        
+                        <!-- Cabeçalho Fixo -->
+                        <div class="flex justify-between items-center mb-4 shrink-0">
+                            <h2 class="text-lg font-black text-slate-800 uppercase tracking-tight">Ajustar Card</h2>
+                            <div class="flex items-center gap-2">
+                                <button onclick="openCardPreview('edit')" class="bg-indigo-50 text-indigo-600 p-2.5 rounded-xl active:scale-90 transition-transform"><i data-lucide="eye" class="w-4.5 h-4.5"></i></button>
+                                <button onclick="deleteCard('${card.id}', true)" class="bg-rose-50 text-rose-500 p-2.5 rounded-xl active:scale-90 transition-transform"><i data-lucide="trash-2" class="w-4.5 h-4.5"></i></button>
+                                <button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; clearTempDraft(); render();" class="bg-slate-50 p-2 rounded-xl text-slate-300"><i data-lucide="x" class="w-5 h-5"></i></button>
                             </div>
                         </div>
-                        <div class="space-y-6">
+
+                        <!-- Área de Formulário Rolável -->
+                        <div class="flex-1 overflow-y-auto space-y-4 pr-1 custom-scroll">
                             <div>
-                                <p class="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest ml-1">Tipo de Card</p>
+                                <p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Tipo de Card</p>
                                 <div class="grid grid-cols-3 gap-2">
-                                    <button onclick="tempDraft.type='basic'; render();" class="text-[8px] font-black uppercase py-4 border-2 rounded-2xl transition-all ${tempDraft.type==='basic'?'bg-indigo-600 border-indigo-600 text-white shadow-lg':'border-slate-50 text-slate-400 bg-slate-50'}">Card 1</button>
-                                    <button onclick="tempDraft.type='complete'; render();" class="text-[8px] font-black uppercase py-4 border-2 rounded-2xl transition-all ${tempDraft.type==='complete'?'bg-indigo-600 border-indigo-600 text-white shadow-lg':'border-slate-50 text-slate-400 bg-slate-50'}">Card 2</button>
-                                    <button onclick="tempDraft.type='cloze'; render();" class="text-[8px] font-black uppercase py-4 border-2 rounded-2xl transition-all ${tempDraft.type==='cloze'?'bg-indigo-600 border-indigo-600 text-white shadow-lg':'border-slate-50 text-slate-400 bg-slate-50'}">Lacuna</button>
+                                    <button onclick="tempDraft.type='basic'; render();" class="text-[8px] font-black uppercase py-3 border-2 rounded-xl transition-all ${tempDraft.type==='basic'?'bg-indigo-600 border-indigo-600 text-white shadow-md':'border-slate-50 text-slate-400 bg-slate-50'}">Card 1</button>
+                                    <button onclick="tempDraft.type='complete'; render();" class="text-[8px] font-black uppercase py-3 border-2 rounded-xl transition-all ${tempDraft.type==='complete'?'bg-indigo-600 border-indigo-600 text-white shadow-md':'border-slate-50 text-slate-400 bg-slate-50'}">Card 2</button>
+                                    <button onclick="tempDraft.type='cloze'; render();" class="text-[8px] font-black uppercase py-3 border-2 rounded-xl transition-all ${tempDraft.type==='cloze'?'bg-indigo-600 border-indigo-600 text-white shadow-md':'border-slate-50 text-slate-400 bg-slate-50'}">Lacuna</button>
                                 </div>
                             </div>
 
-                            <div class="bg-amber-50 p-4 rounded-3xl border border-amber-100 flex justify-between items-center">
-                                <div><p class="text-[9px] font-black text-amber-600 uppercase mb-1 tracking-widest">Estado</p><p class="text-[11px] font-bold text-amber-800">${isNewCard(card) ? 'Novo' : 'Aprendizado'}</p></div>
-                                ${!isNewCard(card) ? `<button onclick="showConfirmResetModal=true; render();" class="text-[9px] font-black text-white bg-amber-500 px-4 py-2.5 rounded-2xl uppercase active:scale-95 transition-all">Resetar</button>` : ''}
+                            <div class="bg-amber-50 p-3.5 rounded-2xl border border-amber-100 flex justify-between items-center">
+                                <div><p class="text-[9px] font-black text-amber-600 uppercase mb-0.5 tracking-widest">Estado</p><p class="text-[11px] font-bold text-amber-800">${isNewCard(card) ? 'Novo' : 'Aprendizado'}</p></div>
+                                ${!isNewCard(card) ? `<button onclick="showConfirmResetModal=true; render();" class="text-[9px] font-black text-white bg-amber-500 px-3.5 py-2 rounded-xl uppercase active:scale-95 transition-all">Resetar</button>` : ''}
                             </div>
+
                             <div>
-                                <div class="flex justify-between items-end mb-2 ml-1">
+                                <div class="flex justify-between items-end mb-1.5 px-1">
                                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Frente</p>
-                                    <label class="cursor-pointer bg-slate-100 text-slate-400 p-2 rounded-xl active:scale-90 transition-all">
-                                        <i data-lucide="camera" class="w-4 h-4"></i>
+                                    <label class="cursor-pointer bg-slate-100 text-slate-400 p-1.5 rounded-lg active:scale-90 transition-all">
+                                        <i data-lucide="camera" class="w-3.5 h-3.5"></i>
                                         <input type="file" accept="image/*,.gif" class="hidden" onchange="handleImageUpload(this, 'imgF')">
                                     </label>
                                 </div>
-                                ${tempDraft.imgF ? `<div class="relative inline-block mb-2"><img src="${tempDraft.imgF}" class="h-20 w-auto rounded-xl object-cover shadow-sm"><button onclick="tempDraft.imgF=''; render();" class="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1"><i data-lucide="x" class="w-3 h-3"></i></button></div>` : ''}
-                                <textarea oninput="tempDraft.f=this.value" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-28 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${tempDraft.f}</textarea>
+                                ${tempDraft.imgF ? `<div class="relative inline-block mb-1.5"><img src="${tempDraft.imgF}" class="h-16 w-auto rounded-xl object-cover shadow-sm"><button onclick="tempDraft.imgF=''; render();" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5"><i data-lucide="x" class="w-2.5 h-2.5"></i></button></div>` : ''}
+                                <textarea oninput="tempDraft.f=this.value" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-24 focus:ring-2 focus:ring-indigo-500 outline-none text-xs leading-relaxed">${tempDraft.f}</textarea>
                             </div>
+
                             ${tempDraft.type !== 'cloze' ? `
                                 <div>
-                                    <div class="flex justify-between items-end mb-2 ml-1">
+                                    <div class="flex justify-between items-end mb-1.5 px-1">
                                         <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Verso</p>
-                                        <label class="cursor-pointer bg-slate-100 text-slate-400 p-2 rounded-xl active:scale-90 transition-all">
-                                            <i data-lucide="camera" class="w-4 h-4"></i>
+                                        <label class="cursor-pointer bg-slate-100 text-slate-400 p-1.5 rounded-lg active:scale-90 transition-all">
+                                            <i data-lucide="camera" class="w-3.5 h-3.5"></i>
                                             <input type="file" accept="image/*,.gif" class="hidden" onchange="handleImageUpload(this, 'imgB')">
                                         </label>
                                     </div>
-                                    ${tempDraft.imgB ? `<div class="relative inline-block mb-2"><img src="${tempDraft.imgB}" class="h-20 w-auto rounded-xl object-cover shadow-sm"><button onclick="tempDraft.imgB=''; render();" class="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1"><i data-lucide="x" class="w-3 h-3"></i></button></div>` : ''}
-                                    <textarea oninput="tempDraft.b=this.value" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${tempDraft.b}</textarea>
+                                    ${tempDraft.imgB ? `<div class="relative inline-block mb-1.5"><img src="${tempDraft.imgB}" class="h-16 w-auto rounded-xl object-cover shadow-sm"><button onclick="tempDraft.imgB=''; render();" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5"><i data-lucide="x" class="w-2.5 h-2.5"></i></button></div>` : ''}
+                                    <textarea oninput="tempDraft.b=this.value" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-xs leading-relaxed">${tempDraft.b}</textarea>
                                 </div>
                             ` : ''}
-                            ${tempDraft.type === 'complete' ? `<div><p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest ml-1">Exemplo</p><textarea oninput="tempDraft.ex=this.value" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed italic">${tempDraft.ex}</textarea></div>` : ''}
+
+                            ${tempDraft.type === 'complete' ? `
+                                <div>
+                                    <p class="text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-widest ml-1">Exemplo</p>
+                                    <textarea oninput="tempDraft.ex=this.value" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-xs leading-relaxed italic">${tempDraft.ex}</textarea>
+                                </div>
+                            ` : ''}
+
                             ${tempDraft.type === 'cloze' ? `
                                 <div>
-                                    <div class="flex justify-between items-end mb-2 ml-1">
+                                    <div class="flex justify-between items-end mb-1.5 px-1">
                                         <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dica</p>
-                                        <label class="cursor-pointer bg-slate-100 text-slate-400 p-2 rounded-xl active:scale-90 transition-all">
-                                            <i data-lucide="camera" class="w-4 h-4"></i>
+                                        <label class="cursor-pointer bg-slate-100 text-slate-400 p-1.5 rounded-lg active:scale-90 transition-all">
+                                            <i data-lucide="camera" class="w-3.5 h-3.5"></i>
                                             <input type="file" accept="image/*,.gif" class="hidden" onchange="handleImageUpload(this, 'imgHint')">
                                         </label>
                                     </div>
-                                    ${tempDraft.imgHint ? `<div class="relative inline-block mb-2"><img src="${tempDraft.imgHint}" class="h-20 w-auto rounded-xl object-cover shadow-sm"><button onclick="tempDraft.imgHint=''; render();" class="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1"><i data-lucide="x" class="w-3 h-3"></i></button></div>` : ''}
-                                    <textarea oninput="tempDraft.hint=this.value" class="w-full bg-slate-50 border-0 rounded-3xl p-5 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-sm leading-relaxed">${tempDraft.hint}</textarea>
-                                </div>` : ''}
-                            <div class="grid grid-cols-2 gap-3 pt-4"><button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; clearTempDraft(); render();" class="bg-slate-100 text-slate-500 py-4 rounded-3xl font-bold active:scale-95 transition-transform">Cancelar</button><button onclick="saveEditedCard()" class="bg-indigo-600 text-white py-4 rounded-3xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all">Salvar</button></div>
+                                    ${tempDraft.imgHint ? `<div class="relative inline-block mb-1.5"><img src="${tempDraft.imgHint}" class="h-16 w-auto rounded-xl object-cover shadow-sm"><button onclick="tempDraft.imgHint=''; render();" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5"><i data-lucide="x" class="w-2.5 h-2.5"></i></button></div>` : ''}
+                                    <textarea oninput="tempDraft.hint=this.value" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-xs leading-relaxed">${tempDraft.hint}</textarea>
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <!-- Rodapé Fixo (Cancelar e Salvar sempre visíveis) -->
+                        <div class="grid grid-cols-2 gap-3 pt-3 mt-3 border-t border-slate-100 bg-white shrink-0">
+                            <button onclick="showEditCardModal=false; if(!isEditingFromStudy) showManageCardsModal=true; clearTempDraft(); render();" class="bg-slate-100 text-slate-500 py-3.5 rounded-2xl font-bold text-xs active:scale-95 transition-transform">Cancelar</button>
+                            <button onclick="saveEditedCard()" class="bg-indigo-600 text-white py-3.5 rounded-2xl font-bold text-xs shadow-md active:scale-95 transition-all">Salvar</button>
                         </div>
                     </div>
                 </div>
@@ -847,7 +867,6 @@
             if (isEditingFromStudy) { 
                 const qIdx = studyQueue.findIndex(c => String(c.id) === String(editingCardId)); 
                 if (qIdx !== -1) {
-                    // Atualiza os dados do card na fila, mas preserva o estado de agendamento que ele já tinha na fila ativa
                     studyQueue[qIdx].type = card.type;
                     studyQueue[qIdx].f = card.f;
                     studyQueue[qIdx].b = card.b;
@@ -895,80 +914,95 @@
             `;
         }
 
-        // ALTERAÇÃO CRUCIAL: Modal de adição compacto para mobile
+        // ALTERAÇÃO: Modal de Novo Card também ajustado com Cabeçalho e Rodapé Fixos para consistência e usabilidade.
         function renderAddCardModal() {
             return `
                 <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-                    <div class="bg-white rounded-t-[32px] sm:rounded-[32px] p-5 w-full max-w-sm overflow-y-auto max-h-[92vh] modal-enter shadow-2xl">
-                        <div class="flex justify-between items-center mb-4">
+                    <div class="bg-white rounded-t-[32px] sm:rounded-[32px] p-5 w-full max-w-sm h-[85vh] sm:h-auto sm:max-h-[92vh] flex flex-col modal-enter shadow-2xl overflow-hidden">
+                        
+                        <!-- Cabeçalho Fixo -->
+                        <div class="flex justify-between items-center mb-3 shrink-0">
                             <h2 class="text-lg font-black text-slate-800 uppercase tracking-tight">Novo Card</h2>
                             <div class="flex items-center gap-2">
                                 ${addMode === 'single' ? `<button onclick="openCardPreview('add')" class="bg-indigo-50 text-indigo-600 p-2 rounded-xl active:scale-90 transition-transform"><i data-lucide="eye" class="w-4 h-4"></i></button>` : ''}
                                 <button onclick="showAddCardModal=false; clearTempDraft(); render();" class="bg-slate-50 p-2 rounded-xl text-slate-300"><i data-lucide="x" class="w-5 h-5"></i></button>
                             </div>
                         </div>
-                        <div class="flex bg-slate-100 p-1 rounded-2xl mb-4 text-[8px] font-black uppercase tracking-widest">
+
+                        <!-- Menu de Abas Fixo -->
+                        <div class="flex bg-slate-100 p-1 rounded-2xl mb-4 text-[8px] font-black uppercase tracking-widest shrink-0">
                             <button onclick="addMode='single'; render();" class="flex-1 py-2 rounded-[0.75rem] transition-all ${addMode==='single'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Individual</button>
                             <button onclick="addMode='bulk'; render();" class="flex-1 py-2 rounded-[0.75rem] transition-all ${addMode==='bulk'?'bg-white shadow-sm text-indigo-600':'text-slate-400'}">Importar</button>
                         </div>
-                        <div id="feedbackBox" class="hidden bg-emerald-50 text-emerald-600 text-[10px] font-bold py-2 px-3 rounded-xl mb-3 text-center flex items-center justify-center gap-1.5"><i data-lucide="check-circle" class="w-3 h-3"></i> Card Adicionado!</div>
                         
-                        ${addMode === 'single' ? `
-                            <div class="grid grid-cols-3 gap-1.5 mb-4">
-                                <button onclick="cardSubtype='basic'; render();" class="text-[8px] font-black uppercase py-2 border-2 rounded-xl transition-all ${cardSubtype==='basic'?'bg-indigo-600 border-indigo-600 text-white shadow-md':'border-slate-50 text-slate-400 bg-slate-50'}">Card 1</button>
-                                <button onclick="cardSubtype='complete'; render();" class="text-[8px] font-black uppercase py-2 border-2 rounded-xl transition-all ${cardSubtype==='complete'?'bg-indigo-600 border-indigo-600 text-white shadow-md':'border-slate-50 text-slate-400 bg-slate-50'}">Card 2</button>
-                                <button onclick="cardSubtype='cloze' ; render();" class="text-[8px] font-black uppercase py-2 border-2 rounded-xl transition-all ${cardSubtype==='cloze'?'bg-indigo-600 border-indigo-600 text-white shadow-md':'border-slate-50 text-slate-400 bg-slate-50'}">Lacuna</button>
-                            </div>
-                            <div class="space-y-3">
-                                <div>
-                                    <div class="flex justify-between items-end mb-1 px-1">
-                                        <span class="text-[8px] font-black uppercase text-slate-400 tracking-widest">Frente</span>
-                                        <label class="cursor-pointer bg-slate-50 text-slate-400 p-1.5 rounded-lg active:scale-90 transition-all">
-                                            <i data-lucide="camera" class="w-3.5 h-3.5"></i>
-                                            <input type="file" accept="image/*,.gif" class="hidden" onchange="handleImageUpload(this, 'imgF')">
-                                        </label>
-                                    </div>
-                                    ${tempDraft.imgF ? `<div class="relative inline-block mb-1"><img src="${tempDraft.imgF}" class="h-12 w-auto rounded-lg object-cover shadow-sm"><button onclick="tempDraft.imgF=''; render();" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5"><i data-lucide="x" class="w-2 h-2"></i></button></div>` : ''}
-                                    <textarea id="newF" oninput="tempDraft.f=this.value" placeholder="${cardSubtype === 'cloze' ? 'Frase com [termo]' : 'Frente'}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-16 focus:ring-2 focus:ring-indigo-500 outline-none text-xs transition-all leading-relaxed">${tempDraft.f}</textarea>
+                        <div id="feedbackBox" class="hidden bg-emerald-50 text-emerald-600 text-[10px] font-bold py-2 px-3 rounded-xl mb-3 text-center flex items-center justify-center gap-1.5 shrink-0"><i data-lucide="check-circle" class="w-3 h-3"></i> Card Adicionado!</div>
+                        
+                        <!-- Conteúdo Rolável -->
+                        <div class="flex-1 overflow-y-auto space-y-3 pr-1 custom-scroll">
+                            ${addMode === 'single' ? `
+                                <div class="grid grid-cols-3 gap-1.5 mb-2">
+                                    <button onclick="cardSubtype='basic'; render();" class="text-[8px] font-black uppercase py-2 border-2 rounded-xl transition-all ${cardSubtype==='basic'?'bg-indigo-600 border-indigo-600 text-white shadow-md':'border-slate-50 text-slate-400 bg-slate-50'}">Card 1</button>
+                                    <button onclick="cardSubtype='complete'; render();" class="text-[8px] font-black uppercase py-2 border-2 rounded-xl transition-all ${cardSubtype==='complete'?'bg-indigo-600 border-indigo-600 text-white shadow-md':'border-slate-50 text-slate-400 bg-slate-50'}">Card 2</button>
+                                    <button onclick="cardSubtype='cloze' ; render();" class="text-[8px] font-black uppercase py-2 border-2 rounded-xl transition-all ${cardSubtype==='cloze'?'bg-indigo-600 border-indigo-600 text-white shadow-md':'border-slate-50 text-slate-400 bg-slate-50'}">Lacuna</button>
                                 </div>
-                                ${cardSubtype !== 'cloze' ? `
+                                <div class="space-y-3">
                                     <div>
                                         <div class="flex justify-between items-end mb-1 px-1">
-                                            <span class="text-[8px] font-black uppercase text-slate-400 tracking-widest">Verso</span>
+                                            <span class="text-[8px] font-black uppercase text-slate-400 tracking-widest">Frente</span>
                                             <label class="cursor-pointer bg-slate-50 text-slate-400 p-1.5 rounded-lg active:scale-90 transition-all">
                                                 <i data-lucide="camera" class="w-3.5 h-3.5"></i>
-                                                <input type="file" accept="image/*,.gif" class="hidden" onchange="handleImageUpload(this, 'imgB')">
+                                                <input type="file" accept="image/*,.gif" class="hidden" onchange="handleImageUpload(this, 'imgF')">
                                             </label>
                                         </div>
-                                        ${tempDraft.imgB ? `<div class="relative inline-block mb-1"><img src="${tempDraft.imgB}" class="h-12 w-auto rounded-lg object-cover shadow-sm"><button onclick="tempDraft.imgB=''; render();" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5"><i data-lucide="x" class="w-2 h-2"></i></button></div>` : ''}
-                                        <textarea id="newB" oninput="tempDraft.b=this.value" placeholder="Verso" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-14 focus:ring-2 focus:ring-indigo-500 outline-none text-xs transition-all leading-relaxed">${tempDraft.b}</textarea>
+                                        ${tempDraft.imgF ? `<div class="relative inline-block mb-1"><img src="${tempDraft.imgF}" class="h-12 w-auto rounded-lg object-cover shadow-sm"><button onclick="tempDraft.imgF=''; render();" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5"><i data-lucide="x" class="w-2 h-2"></i></button></div>` : ''}
+                                        <textarea id="newF" oninput="tempDraft.f=this.value" placeholder="${cardSubtype === 'cloze' ? 'Frase com [termo]' : 'Frente'}" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-20 focus:ring-2 focus:ring-indigo-500 outline-none text-xs transition-all leading-relaxed">${tempDraft.f}</textarea>
                                     </div>
-                                ` : ''}
-                                ${cardSubtype === 'complete' ? `<textarea id="newEx" oninput="tempDraft.ex=this.value" placeholder="Exemplo" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-14 focus:ring-2 focus:ring-indigo-500 outline-none text-xs italic leading-relaxed">${tempDraft.ex}</textarea>` : ''}
-                                ${cardSubtype === 'cloze' ? `
-                                    <div>
-                                        <div class="flex justify-between items-end mb-1 px-1">
-                                            <span class="text-[8px] font-black uppercase text-slate-400 tracking-widest">Dica</span>
-                                            <label class="cursor-pointer bg-slate-50 text-slate-400 p-1.5 rounded-lg active:scale-90 transition-all">
-                                                <i data-lucide="camera" class="w-3.5 h-3.5"></i>
-                                                <input type="file" accept="image/*,.gif" class="hidden" onchange="handleImageUpload(this, 'imgHint')">
-                                            </label>
+                                    ${cardSubtype !== 'cloze' ? `
+                                        <div>
+                                            <div class="flex justify-between items-end mb-1 px-1">
+                                                <span class="text-[8px] font-black uppercase text-slate-400 tracking-widest">Verso</span>
+                                                <label class="cursor-pointer bg-slate-50 text-slate-400 p-1.5 rounded-lg active:scale-90 transition-all">
+                                                    <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+                                                    <input type="file" accept="image/*,.gif" class="hidden" onchange="handleImageUpload(this, 'imgB')">
+                                                </label>
+                                            </div>
+                                            ${tempDraft.imgB ? `<div class="relative inline-block mb-1"><img src="${tempDraft.imgB}" class="h-12 w-auto rounded-lg object-cover shadow-sm"><button onclick="tempDraft.imgB=''; render();" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5"><i data-lucide="x" class="w-2 h-2"></i></button></div>` : ''}
+                                            <textarea id="newB" oninput="tempDraft.b=this.value" placeholder="Verso" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-16 focus:ring-2 focus:ring-indigo-500 outline-none text-xs transition-all leading-relaxed">${tempDraft.b}</textarea>
                                         </div>
-                                        ${tempDraft.imgHint ? `<div class="relative inline-block mb-1"><img src="${tempDraft.imgHint}" class="h-12 w-auto rounded-lg object-cover shadow-sm"><button onclick="tempDraft.imgHint=''; render();" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5"><i data-lucide="x" class="w-2 h-2"></i></button></div>` : ''}
-                                        <textarea id="newHint" oninput="tempDraft.hint=this.value" placeholder="Texto da Dica" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-14 focus:ring-2 focus:ring-indigo-500 outline-none text-xs leading-relaxed">${tempDraft.hint}</textarea>
-                                    </div>` : ''}
-                                <button onclick="saveSingleCard()" class="w-full bg-indigo-600 text-white py-3.5 rounded-2xl font-bold text-xs shadow-md shadow-indigo-100 active:scale-95 transition-all mt-2">Adicionar Card</button>
-                            </div>
-                        ` : `
-                            <textarea id="bulkData" placeholder="Ex: I drink [coffee];café" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-48 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-[9px] shadow-inner"></textarea>
-                            <button onclick="saveBulkCards()" class="w-full bg-indigo-600 text-white py-3.5 rounded-2xl font-bold text-xs mt-4 active:scale-95 transition-all">Iniciar Importação</button>
-                        `}
+                                    ` : ''}
+                                    ${cardSubtype === 'complete' ? `<textarea id="newEx" oninput="tempDraft.ex=this.value" placeholder="Exemplo" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-16 focus:ring-2 focus:ring-indigo-500 outline-none text-xs italic leading-relaxed">${tempDraft.ex}</textarea>` : ''}
+                                    ${cardSubtype === 'cloze' ? `
+                                        <div>
+                                            <div class="flex justify-between items-end mb-1 px-1">
+                                                <span class="text-[8px] font-black uppercase text-slate-400 tracking-widest">Dica</span>
+                                                <label class="cursor-pointer bg-slate-50 text-slate-400 p-1.5 rounded-lg active:scale-90 transition-all">
+                                                    <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+                                                    <input type="file" accept="image/*,.gif" class="hidden" onchange="handleImageUpload(this, 'imgHint')">
+                                                </label>
+                                            </div>
+                                            ${tempDraft.imgHint ? `<div class="relative inline-block mb-1"><img src="${tempDraft.imgHint}" class="h-12 w-auto rounded-lg object-cover shadow-sm"><button onclick="tempDraft.imgHint=''; render();" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5"><i data-lucide="x" class="w-2 h-2"></i></button></div>` : ''}
+                                            <textarea id="newHint" oninput="tempDraft.hint=this.value" placeholder="Texto da Dica" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-16 focus:ring-2 focus:ring-indigo-500 outline-none text-xs leading-relaxed">${tempDraft.hint}</textarea>
+                                        </div>` : ''}
+                                </div>
+                            ` : `
+                                <textarea id="bulkData" placeholder="Ex: I drink [coffee];café" class="w-full bg-slate-50 border-0 rounded-2xl p-4 h-full min-h-[120px] focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-[9px] shadow-inner"></textarea>
+                            `}
+                        </div>
+
+                        <!-- Rodapé Fixo (Ação Principal sempre visível) -->
+                        <div class="pt-3 border-t border-slate-100 bg-white shrink-0">
+                            ${addMode === 'single' ? `
+                                <button onclick="saveSingleCard()" class="w-full bg-indigo-600 text-white py-3.5 rounded-2xl font-bold text-xs shadow-md active:scale-95 transition-all">Adicionar Card</button>
+                            ` : `
+                                <button onclick="saveBulkCards()" class="w-full bg-indigo-600 text-white py-3.5 rounded-2xl font-bold text-xs active:scale-95 transition-all">Iniciar Importação</button>
+                            `}
+                        </div>
+
                     </div>
                 </div>
             `;
         }
 
-        // ALTERAÇÃO: Ao adicionar card no meio da sessão de estudos, não polui a fila de estudo atual
         function saveSingleCard() {
             const fText = tempDraft.f.trim();
             if (!fText && !tempDraft.imgF) return;
@@ -989,9 +1023,6 @@
             
             decks[idx].cards.push(newCard);
             saveDecks(); 
-            
-            // NÃO adicionamos o card na `studyQueue` para evitar que ele interfira na sessão corrente como card pendente imediato.
-            // Ele fica guardado no Deck e estará pronto para as próximas sessões.
 
             const fb = document.getElementById('feedbackBox');
             if(fb) {
@@ -1008,7 +1039,6 @@
             render();
         }
 
-        // ALTERAÇÃO: Ao importar em massa no meio da sessão de estudos, também não polui a fila ativa
         function saveBulkCards() {
             const data = document.getElementById('bulkData').value.trim();
             if(!data) return;
@@ -1036,7 +1066,6 @@
             });
             
             saveDecks(); 
-            // Não polui `studyQueue` de forma pendente no meio do estudo. Fica guardado apenas no banco físico de cartões.
             showAddCardModal = false; render();
         }
 
